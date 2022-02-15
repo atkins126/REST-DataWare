@@ -31,6 +31,7 @@ Type
  Private
   vElementType : TRESTDWJSONElementType;
   vValue       : Variant;
+  vSpecialChars,
   vIsNull      : Boolean;
   Procedure   SetValue    (aValue : Variant);
  Public
@@ -38,33 +39,32 @@ Type
   Destructor  Destroy;Override;
   Procedure   Clear;
   Function    ToJSON              : String;Virtual;
-  Property    ElementType         : TRESTDWJSONElementType Read VElementType Write VElementType;
-  Property    Value               : Variant                Read vValue       Write SetValue;
-  Property    IsNull              : Boolean                Read vIsNull      Write vIsNull;
+  Property    ElementType         : TRESTDWJSONElementType Read VElementType  Write VElementType;
+  Property    Value               : Variant                Read vValue        Write SetValue;
+  Property    IsNull              : Boolean                Read vIsNull       Write vIsNull;
+  Property    SpecialChars        : Boolean                Read vSpecialChars Write vSpecialChars;
 End;
 
 Type
  PRESTDWJSONBaseObjectClass = ^TRESTDWJSONBaseObjectClass;
  TRESTDWJSONBaseObjectClass = Class(TRESTDWJSONBaseClass)
  Private
-  vElementName : String;
-  VObjectType  : TRESTDWJSONObjectType;
+  vElementName  : String;
+  VObjectType   : TRESTDWJSONObjectType;
  Private
-  Property ElementType  : TRESTDWJSONElementType Read VElementType Write VElementType;
+  Property ElementType  : TRESTDWJSONElementType Read VElementType  Write VElementType;
  Public
   Function ToJSON       : String; Override;
-  Property ElementName  : String                 Read vElementName Write vElementName;
+  Property ElementName  : String                 Read vElementName  Write vElementName;
 End;
 
 Type
  PRESTDWJSONString = ^TRESTDWJSONString;
  TRESTDWJSONString = Class(TRESTDWJSONBaseObjectClass)
  Private
-  vSpecialChars         : Boolean;
  Public
   Constructor Create;
   Property ElementName  : String  Read vElementName  Write vElementName;
-  Property SpecialChars : Boolean Read vSpecialChars Write vSpecialChars;
   Function ToJSON       : String; Override;
 End;
 
@@ -128,6 +128,7 @@ End;
 Type
  TRESTDWJSONBase = Class(TObject)
  Private
+  vSpecialChars                      : Boolean;
   vList                              : TList;
   vJSONObjectType                    : TRESTDWJSONObjectType;
   vElementName                       : String;
@@ -154,8 +155,7 @@ Type
   Function    AddNull  (Key             : String;
                         ElementType     : TRESTDWJSONElementType = etString) : Integer;
   Function    Add      (Key,
-                        Value           : String;
-                        SpecialChars    : Boolean = True)  : Integer;Overload;
+                        Value           : String)  : Integer;Overload;
   Function    Add      (Key             : String;
                         Value           : Integer)         : Integer;Overload;
   Function    Add      (Key             : String;
@@ -185,10 +185,11 @@ Type
   Function    Count               : Integer;
   Function    ToJSON              : String;Virtual;
   Function    SaveToFile   (Filename : String)     : Boolean;
-  Property    Elements     [Index : Integer]       : TRESTDWJSONBaseObjectClass Read GetRec       Write PutRec; Default;
-  Property    ElementByName[Index : String ]       : TRESTDWJSONBaseObjectClass Read GetRecName   Write PutRecName;
-  Property    ElementName         : String                                      Read vElementName Write vElementName;
+  Property    Elements     [Index : Integer]       : TRESTDWJSONBaseObjectClass Read GetRec        Write PutRec; Default;
+  Property    ElementByName[Index : String ]       : TRESTDWJSONBaseObjectClass Read GetRecName    Write PutRecName;
+  Property    ElementName         : String                                      Read vElementName  Write vElementName;
   Property    ObjectType          : TRESTDWJSONObjectType                       Read vJSONObjectType;
+  Property    SpecialChars        : Boolean                                     Read vSpecialChars Write vSpecialChars;
 End;
 
 Type
@@ -415,20 +416,21 @@ Var
  BaseObjectClass : ^TRESTDWJSONInteger;
 Begin
  New(BaseObjectClass);
- BaseObjectClass^             := TRESTDWJSONInteger.Create;
- BaseObjectClass^.ElementName := Key;
- BaseObjectClass^.Value       := Value;
- Result                       := vList.Add(BaseObjectClass);
+ BaseObjectClass^              := TRESTDWJSONInteger.Create;
+ BaseObjectClass^.SpecialChars := vSpecialChars;
+ BaseObjectClass^.ElementName  := Key;
+ BaseObjectClass^.Value        := Value;
+ Result                        := vList.Add(BaseObjectClass);
 End;
 
 Function TRESTDWJSONBase.Add(Key,
-                             Value        : String;
-                             SpecialChars : Boolean = True) : Integer;
+                             Value        : String) : Integer;
 Var
  BaseObjectClass : ^TRESTDWJSONString;
 Begin
  New(BaseObjectClass);
  BaseObjectClass^              := TRESTDWJSONString.Create;
+ BaseObjectClass^.SpecialChars := vSpecialChars;
  BaseObjectClass^.ElementName  := Key;
  BaseObjectClass^.Value        := Value;
  BaseObjectClass^.SpecialChars := SpecialChars;
@@ -441,10 +443,11 @@ Var
  BaseObjectClass : ^TRESTDWJSONNumeric;
 Begin
  New(BaseObjectClass);
- BaseObjectClass^             := TRESTDWJSONNumeric.Create;
- BaseObjectClass^.ElementName := Key;
- BaseObjectClass^.Value       := Value;
- Result                       := vList.Add(BaseObjectClass);
+ BaseObjectClass^              := TRESTDWJSONNumeric.Create;
+ BaseObjectClass^.SpecialChars := vSpecialChars;
+ BaseObjectClass^.ElementName  := Key;
+ BaseObjectClass^.Value        := Value;
+ Result                        := vList.Add(BaseObjectClass);
 End;
 
 Function TRESTDWJSONBase.Add(Key             : String;
@@ -453,10 +456,11 @@ Var
  BaseObjectClass : ^TRESTDWJSONNumeric;
 Begin
  New(BaseObjectClass);
- BaseObjectClass^             := TRESTDWJSONNumeric.Create;
- BaseObjectClass^.ElementName := Key;
- BaseObjectClass^.Value       := Value;
- Result                       := vList.Add(BaseObjectClass);
+ BaseObjectClass^              := TRESTDWJSONNumeric.Create;
+ BaseObjectClass^.SpecialChars := vSpecialChars;
+ BaseObjectClass^.ElementName  := Key;
+ BaseObjectClass^.Value        := Value;
+ Result                        := vList.Add(BaseObjectClass);
 End;
 
 Function TRESTDWJSONBase.Add(Key   : String;
@@ -465,10 +469,11 @@ Var
  BaseObjectClass : ^TRESTDWJSONBoolean;
 Begin
  New(BaseObjectClass);
- BaseObjectClass^             := TRESTDWJSONBoolean.Create;
- BaseObjectClass^.ElementName := Key;
- BaseObjectClass^.Value       := Value;
- Result                       := vList.Add(BaseObjectClass);
+ BaseObjectClass^              := TRESTDWJSONBoolean.Create;
+ BaseObjectClass^.SpecialChars := vSpecialChars;
+ BaseObjectClass^.ElementName  := Key;
+ BaseObjectClass^.Value        := Value;
+ Result                        := vList.Add(BaseObjectClass);
 End;
 
 Function TRESTDWJSONBase.AddDateTime(Key             : String;
@@ -480,6 +485,7 @@ Var
 Begin
  New(BaseObjectClass);
  BaseObjectClass^                := TRESTDWJSONDateTime.Create;
+ BaseObjectClass^.SpecialChars   := vSpecialChars;
  BaseObjectClass^.ElementName    := Key;
  BaseObjectClass^.Value          := Value;
  BaseObjectClass^.DateTimeFormat := aDateTimeFormat;
@@ -496,6 +502,7 @@ Var
 Begin
  New(BaseObjectClass);
  BaseObjectClass^                := TRESTDWJSONDateTime.Create;
+ BaseObjectClass^.SpecialChars   := vSpecialChars;
  BaseObjectClass^.ElementName    := Key;
  BaseObjectClass^.Value          := Value;
  BaseObjectClass^.DateTimeFormat := aDateTimeFormat;
@@ -509,10 +516,11 @@ Var
  BaseObjectClass : ^TRESTDWJSONBlob;
 Begin
  New(BaseObjectClass);
- BaseObjectClass^             := TRESTDWJSONBlob.Create;
- BaseObjectClass^.ElementName := Key;
- BaseObjectClass^.Value       := Encodeb64Stream(Value);
- Result                       := vList.Add(BaseObjectClass);
+ BaseObjectClass^              := TRESTDWJSONBlob.Create;
+ BaseObjectClass^.SpecialChars := vSpecialChars;
+ BaseObjectClass^.ElementName  := Key;
+ BaseObjectClass^.Value        := Encodeb64Stream(Value);
+ Result                        := vList.Add(BaseObjectClass);
 End;
 
 Function TRESTDWJSONBase.Add(Value : Integer) : Integer;
@@ -520,10 +528,11 @@ Var
  BaseObjectClass : ^TRESTDWJSONInteger;
 Begin
  New(BaseObjectClass);
- BaseObjectClass^             := TRESTDWJSONInteger.Create;
- BaseObjectClass^.ElementName := '';
- BaseObjectClass^.Value       := Value;
- Result                       := vList.Add(BaseObjectClass);
+ BaseObjectClass^              := TRESTDWJSONInteger.Create;
+ BaseObjectClass^.SpecialChars := vSpecialChars;
+ BaseObjectClass^.ElementName  := '';
+ BaseObjectClass^.Value        := Value;
+ Result                        := vList.Add(BaseObjectClass);
 End;
 
 Function TRESTDWJSONBase.Add(Value : String)  : Integer;
@@ -531,10 +540,11 @@ Var
  BaseObjectClass : ^TRESTDWJSONString;
 Begin
  New(BaseObjectClass);
- BaseObjectClass^             := TRESTDWJSONString.Create;
- BaseObjectClass^.ElementName := '';
- BaseObjectClass^.Value       := Value;
- Result                       := vList.Add(BaseObjectClass);
+ BaseObjectClass^              := TRESTDWJSONString.Create;
+ BaseObjectClass^.SpecialChars := vSpecialChars;
+ BaseObjectClass^.ElementName  := '';
+ BaseObjectClass^.Value        := Value;
+ Result                        := vList.Add(BaseObjectClass);
 End;
 
 Function TRESTDWJSONBase.Add(Key   : String;
@@ -548,6 +558,7 @@ Begin
   ElementName     := ''
  Else
   ElementName     := Key;
+ BaseObjectClass^.SpecialChars := vSpecialChars;
  Result           := vList.Add(BaseObjectClass);
 End;
 
@@ -556,9 +567,10 @@ Var
  BaseObjectClass : ^TRESTDWJSONBase;
 Begin
  New(BaseObjectClass);
- BaseObjectClass^             := Value;
- ElementName                  := '';
- Result                       := vList.Add(BaseObjectClass);
+ BaseObjectClass^              := Value;
+ BaseObjectClass^.SpecialChars := vSpecialChars;
+ ElementName                   := '';
+ Result                        := vList.Add(BaseObjectClass);
 End;
 
 Function TRESTDWJSONBase.AddNull(Key         : String;
@@ -616,10 +628,11 @@ Var
  BaseObjectClass : ^TRESTDWJSONBoolean;
 Begin
  New(BaseObjectClass);
- BaseObjectClass^             := TRESTDWJSONBoolean.Create;
- BaseObjectClass^.ElementName := '';
- BaseObjectClass^.Value       := Value;
- Result                       := vList.Add(BaseObjectClass);
+ BaseObjectClass^              := TRESTDWJSONBoolean.Create;
+ BaseObjectClass^.SpecialChars := vSpecialChars;
+ BaseObjectClass^.ElementName  := '';
+ BaseObjectClass^.Value        := Value;
+ Result                        := vList.Add(BaseObjectClass);
 End;
 
 Function TRESTDWJSONBase.Add(Value : Real) : Integer;
@@ -627,10 +640,11 @@ Var
  BaseObjectClass : ^TRESTDWJSONNumeric;
 Begin
  New(BaseObjectClass);
- BaseObjectClass^             := TRESTDWJSONNumeric.Create;
- BaseObjectClass^.ElementName := '';
- BaseObjectClass^.Value       := Value;
- Result                       := vList.Add(BaseObjectClass);
+ BaseObjectClass^              := TRESTDWJSONNumeric.Create;
+ BaseObjectClass^.SpecialChars := vSpecialChars;
+ BaseObjectClass^.ElementName  := '';
+ BaseObjectClass^.Value        := Value;
+ Result                        := vList.Add(BaseObjectClass);
 End;
 
 Function TRESTDWJSONBase.Add(Const Value : TStream) : Integer;
@@ -638,10 +652,11 @@ Var
  BaseObjectClass : ^TRESTDWJSONBlob;
 Begin
  New(BaseObjectClass);
- BaseObjectClass^             := TRESTDWJSONBlob.Create;
- BaseObjectClass^.ElementName := '';
- BaseObjectClass^.Value       := Encodeb64Stream(Value);
- Result                       := vList.Add(BaseObjectClass);
+ BaseObjectClass^              := TRESTDWJSONBlob.Create;
+ BaseObjectClass^.SpecialChars := vSpecialChars;
+ BaseObjectClass^.ElementName  := '';
+ BaseObjectClass^.Value        := Encodeb64Stream(Value);
+ Result                        := vList.Add(BaseObjectClass);
 End;
 
 Function TRESTDWJSONBase.Add(Value           : TDateTime;
@@ -652,6 +667,7 @@ Var
 Begin
  New(BaseObjectClass);
  BaseObjectClass^                := TRESTDWJSONDateTime.Create;
+ BaseObjectClass^.SpecialChars   := vSpecialChars;
  BaseObjectClass^.ElementName    := '';
  BaseObjectClass^.Value          := Value;
  BaseObjectClass^.DateTimeFormat := aDateTimeFormat;
@@ -752,6 +768,7 @@ End;
 Constructor TRESTDWJSONBase.Create(aObjectType : TRESTDWJSONObjectType);
 Begin
  Inherited Create;
+ vSpecialChars   := True;
  vList           := TList.Create;
  vJSONObjectType := aObjectType;
  vElementName    := '';
@@ -900,7 +917,7 @@ Function TRESTDWJSONBase.Count : Integer;
 Begin
  Result := -1;
  If Assigned(vList) Then
-  Result := vList.Count;
+  Result := TList(vList).Count;
 End;
 
 Constructor TRESTDWJSONBase.Create(JSON : String);
@@ -997,89 +1014,91 @@ Begin
  vLine := '';
  Case aObjectType Of
   jtobject : Begin
-                   Result := '';
-                   For I := 0 To vList.Count -1 Do
-                    Begin
-                     Case GetItemJSONClass(TRESTDWJSONBaseObjectClass(vList.Items[I]^)) of
-                      etUnknow   : Begin
-                                    If TRESTDWJSONBase(vList.Items[I]^).ObjectType In [jtobject,
-                                                                                           jtArray,
-                                                                                           jtValue] Then
-                                     vLine := TRESTDWJSONBase(vList.Items[I]^).ToJSON;
-                                   End;
-                      etString   : vLine := TRESTDWJSONString  (vList.Items[I]^).ToJSON;
-                      etNumeric  : vLine := TRESTDWJSONNumeric (vList.Items[I]^).ToJSON;
-                      etInteger  : vLine := TRESTDWJSONInteger (vList.Items[I]^).ToJSON;
-                      etBoolean  : vLine := TRESTDWJSONBoolean (vList.Items[I]^).ToJSON;
-                      etDateTime : vLine := TRESTDWJSONDateTime(vList.Items[I]^).ToJSON;
-                      etBlob     : vLine := TRESTDWJSONBlob    (vList.Items[I]^).ToJSON;
-                     End;
-                     If Result = '' Then
-                      Result := vLine
-                     Else
-                      Result := Result + ', ' + vLine;
-                     vLine := '';
-                    End;
-                   If elementname <> '' Then
-                    Result := Format('{"%s":%s}', [elementname, Result])
-                   Else
-                    Result := '{' + Result + '}';
-                  End;
+              Result := '';
+              For I := 0 To vList.Count -1 Do
+               Begin
+                Case GetItemJSONClass(TRESTDWJSONBaseObjectClass(vList.Items[I]^)) of
+                 etUnknow   : Begin
+                               Case TRESTDWJSONBase(vList.Items[I]^).ObjectType Of
+                                jtobject : vLine := TRESTDWJSONObject(vList.Items[I]^).ToJSON;
+                                jtArray  : vLine := TRESTDWJSONArray(vList.Items[I]^).ToJSON;
+                                jtValue  : vLine := TRESTDWJSONBase(vList.Items[I]^).ToJSON;
+                               End;
+                              End;
+                 etString   : vLine := TRESTDWJSONString  (vList.Items[I]^).ToJSON;
+                 etNumeric  : vLine := TRESTDWJSONNumeric (vList.Items[I]^).ToJSON;
+                 etInteger  : vLine := TRESTDWJSONInteger (vList.Items[I]^).ToJSON;
+                 etBoolean  : vLine := TRESTDWJSONBoolean (vList.Items[I]^).ToJSON;
+                 etDateTime : vLine := TRESTDWJSONDateTime(vList.Items[I]^).ToJSON;
+                 etBlob     : vLine := TRESTDWJSONBlob    (vList.Items[I]^).ToJSON;
+                End;
+                If Result = '' Then
+                 Result := vLine
+                Else
+                 Begin
+                  If elementname <> '' Then
+                   vLine := Format('"%s":%s', [elementname, vLine]);
+                  Result := Result + ', ' + vLine;
+                 End;
+                vLine := '';
+               End;
+              Result := '{' + Result + '}';
+             End;
   jtArray  : Begin
-                   vLine := '';
-                   For I := 0 To vList.Count -1 Do
-                    Begin
-                     Case TRESTDWJSONBase(vList.Items[I]^).ObjectType Of
-                      jtobject : Begin
-                                       If vLine = '' Then
-                                        vLine := TRESTDWJSONObject(vList.Items[I]^).ToJSON
-                                       Else
-                                        vLine := vLine + ', ' + TRESTDWJSONObject(vList.Items[I]^).ToJSON;
-                                      End;
-                      jtArray  : Begin
-                                       If vLine = '' Then
-                                        vLine := TRESTDWJSONArray(vList.Items[I]^).ToJSON
-                                       Else
-                                        vLine := vLine + ', ' + TRESTDWJSONArray(vList.Items[I]^).ToJSON;
-                                      End;
-                      jtValue  : Begin
-                                       If vLine = '' Then
-                                        vLine := TRESTDWJSONValue(vList.Items[I]^).ToJSON
-                                       Else
-                                        vLine := vLine + ', ' + TRESTDWJSONValue(vList.Items[I]^).ToJSON;
-                                      End;
-                     End;
-                    End;
-                   If elementname <> '' Then
-                    Result := Format('["%s":%s]', [elementname, vLine])
-                   Else
-                    Result := '[' + vLine + ']';
-                  End;
+              vLine := '';
+              For I := 0 To Count -1 Do
+               Begin
+                Case TRESTDWJSONBase(vList.Items[I]^).ObjectType Of
+                 jtobject : Begin
+                             If vLine = '' Then
+                              vLine := TRESTDWJSONObject(vList.Items[I]^).ToJSON
+                             Else
+                              vLine := vLine + ', ' + TRESTDWJSONObject(vList.Items[I]^).ToJSON;
+                            End;
+                 jtArray  : Begin
+                             If vLine = '' Then
+                              vLine := TRESTDWJSONArray(vList.Items[I]^).ToJSON
+                             Else
+                              vLine := vLine + ', ' + TRESTDWJSONArray(vList.Items[I]^).ToJSON;
+                            End;
+                 jtValue  : Begin
+                             If vLine = '' Then
+                              vLine := TRESTDWJSONValue(vList.Items[I]^).ToJSON
+                             Else
+                              vLine := vLine + ', ' + TRESTDWJSONValue(vList.Items[I]^).ToJSON;
+                            End;
+                End;
+               End;
+              If elementname <> '' Then
+               Result := Format('["%s":%s]', [elementname, vLine])
+              Else
+               Result := '[' + vLine + ']';
+             End;
   jtValue  : Begin
-                   Result := '';
-                   For I := 0 To vList.Count -1 Do
-                    Begin
-                     Case GetItemJSONClass(TRESTDWJSONBaseObjectClass(vList.Items[I]^)) of
-                      etUnknow   : Begin
-                                    If TRESTDWJSONBase(vList.Items[I]^).ObjectType In [jtobject,
-                                                                                           jtArray,
-                                                                                           jtValue] Then
-                                     vLine := TRESTDWJSONBase(vList.Items[I]^).ToJSON;
-                                   End;
-                      etString   : vLine := TRESTDWJSONString  (vList.Items[I]^).ToJSON;
-                      etNumeric  : vLine := TRESTDWJSONNumeric (vList.Items[I]^).ToJSON;
-                      etInteger  : vLine := TRESTDWJSONInteger (vList.Items[I]^).ToJSON;
-                      etBoolean  : vLine := TRESTDWJSONBoolean (vList.Items[I]^).ToJSON;
-                      etDateTime : vLine := TRESTDWJSONDateTime(vList.Items[I]^).ToJSON;
-                      etBlob     : vLine := TRESTDWJSONBlob    (vList.Items[I]^).ToJSON;
-                     End;
-                     If Result = '' Then
-                      Result := vLine
-                     Else
-                      Result := Result + ', ' + vLine;
-                     vLine := '';
-                    End;
-                  End;
+              Result := '';
+              For I := 0 To vList.Count -1 Do
+               Begin
+                Case GetItemJSONClass(TRESTDWJSONBaseObjectClass(vList.Items[I]^)) of
+                 etUnknow   : Begin
+                               If TRESTDWJSONBase(vList.Items[I]^).ObjectType In [jtobject,
+                                                                                      jtArray,
+                                                                                      jtValue] Then
+                                vLine := TRESTDWJSONBase(vList.Items[I]^).ToJSON;
+                              End;
+                 etString   : vLine := TRESTDWJSONString  (vList.Items[I]^).ToJSON;
+                 etNumeric  : vLine := TRESTDWJSONNumeric (vList.Items[I]^).ToJSON;
+                 etInteger  : vLine := TRESTDWJSONInteger (vList.Items[I]^).ToJSON;
+                 etBoolean  : vLine := TRESTDWJSONBoolean (vList.Items[I]^).ToJSON;
+                 etDateTime : vLine := TRESTDWJSONDateTime(vList.Items[I]^).ToJSON;
+                 etBlob     : vLine := TRESTDWJSONBlob    (vList.Items[I]^).ToJSON;
+                End;
+                If Result = '' Then
+                 Result := vLine
+                Else
+                 Result := Result + ', ' + vLine;
+                vLine := '';
+               End;
+             End;
   jtunknow : Raise Exception.Create('Invalid Unknow Object');
  End;
 End;
@@ -1112,9 +1131,10 @@ End;
 Constructor TRESTDWJSONBaseClass.Create(aElementType : TRESTDWJSONElementType);
 Begin
  Inherited Create;
- vElementType := aElementType;
- vIsNull      := True;
- vValue       := varNull;
+ vSpecialChars := True;
+ vElementType  := aElementType;
+ vIsNull       := True;
+ vValue        := varNull;
 End;
 
 Procedure TRESTDWJSONBaseClass.SetValue(aValue : Variant);

@@ -353,21 +353,29 @@ Type
    vCriticalSection    : TRTLCriticalSection;
    vDatabaseCharSet    : TDatabaseCharSet;
   {$ELSE}
-  {$IF Defined(HAS_FMX)}
-   {$IFDEF WINDOWS}
-    vDWISAPIRunner     : TDWISAPIRunner;
-    vDWCGIRunner       : TDWCGIRunner;
-   {$ENDIF}
-  {$ELSE}
-   vDWISAPIRunner      : TDWISAPIRunner;
-   vDWCGIRunner        : TDWCGIRunner;
-  {$IFEND}
+   {$IF CompilerVersion > 21}
+    {$IFDEF WINDOWS}
+     vCriticalSection : TRTLCriticalSection;
+    {$ELSE}
+     vCriticalSection : TCriticalSection;
+    {$ENDIF}
+   {$ELSE}
+    vCriticalSection : TCriticalSection;
+   {$IFEND}
+   {$IF Defined(HAS_FMX)}
+    {$IFDEF WINDOWS}
+     vDWISAPIRunner     : TDWISAPIRunner;
+     vDWCGIRunner       : TDWCGIRunner;
+    {$ENDIF}
+   {$ELSE}
+    vDWISAPIRunner      : TDWISAPIRunner;
+    vDWCGIRunner        : TDWCGIRunner;
+   {$IFEND}
   {$ENDIF}
   vBeforeUseCriptKey   : TBeforeUseCriptKey;
   vCORSCustomHeaders,
   vDefaultPage         : TStringList;
   vPathTraversalRaiseError,
-  vMultiCORE,
   vForceWelcomeAccess,
   vCORS,
   vActive              : Boolean;
@@ -394,6 +402,7 @@ Type
   vEncoding            : TEncodeSelect;              //Enconding se usar CORS usar UTF8 - Alexandre Abade
   vSSLVerifyMode       : TIdSSLVerifyModeSet;
   vSSLVerifyDepth      : Integer;
+  vSSLMode             : TIdSSLMode;
   vOnCreate            : TOnCreate;
   Procedure SetServerContext(Value : String);
   Procedure SetCORSCustomHeader (Value : TStringList);
@@ -621,10 +630,10 @@ Type
   Property SSLRootCertFile         : String                     Read vaSSLRootCertFile        Write vaSSLRootCertFile;
   property SSLVerifyMode           : TIdSSLVerifyModeSet        Read vSSLVerifyMode           Write vSSLVerifyMode;
   property SSLVerifyDepth          : Integer                    Read vSSLVerifyDepth          Write vSSLVerifyDepth;
+  property SSLMode                 : TIdSSLMode                 Read vSSLMode                 Write vSSLMode;
   Property ForceWelcomeAccess      : Boolean                    Read vForceWelcomeAccess      Write vForceWelcomeAccess;
   Property OnBeforeUseCriptKey     : TBeforeUseCriptKey         Read vBeforeUseCriptKey       Write vBeforeUseCriptKey;
   Property CriptOptions            : TCripto                    Read vCripto                  Write vCripto;
-  Property MultiCORE               : Boolean                    Read vMultiCORE               Write vMultiCORE;
   {$IFDEF FPC}
   Property DatabaseCharSet         : TDatabaseCharSet           Read vDatabaseCharSet         Write vDatabaseCharSet;
   {$ENDIF}
@@ -667,6 +676,16 @@ Type
   {$IFDEF FPC}
    vCriticalSection    : TRTLCriticalSection;
    vDatabaseCharSet    : TDatabaseCharSet;
+  {$ELSE}
+   {$IF CompilerVersion > 21}
+    {$IFDEF WINDOWS}
+     vCriticalSection : TRTLCriticalSection;
+    {$ELSE}
+     vCriticalSection : TCriticalSection;
+    {$ENDIF}
+   {$ELSE}
+    vCriticalSection : TCriticalSection;
+   {$IFEND}
   {$ENDIF}
   Procedure Loaded; Override;
   Procedure SetServerMethod       (Value                   : TComponentClass);
@@ -994,6 +1013,7 @@ Type
   vUserAgent,
   vAccessTag,
   vWelcomeMessage,
+  vPoolerNotFoundMessage,
   vServerContext,
   vUrlPath,
   vHost                : String;
@@ -1081,6 +1101,7 @@ Type
   Property BinaryRequest           : Boolean                    Read vBinaryRequest           Write vBinaryRequest;
   Property CriptOptions            : TCripto                    Read vCripto                  Write vCripto;
   Property UserAgent               : String                     Read vUserAgent               Write vUserAgent;
+  Property PoolerNotFoundMessage   : String                     Read vPoolerNotFoundMessage   Write vPoolerNotFoundMessage;
   {$IFDEF FPC}
   Property DatabaseCharSet         : TDatabaseCharSet           Read vDatabaseCharSet         Write vDatabaseCharSet;
   {$ENDIF}
@@ -1130,7 +1151,13 @@ Begin
  Result := '';
  vPos   := Pos('token=', Lowercase(Value));
  If vPos > 0 Then
-  vPos  := vPos + Length('token=');
+  vPos  := vPos + Length('token=')
+ Else
+  Begin
+   vPos := Pos('basic ', Lowercase(Value));
+   If vPos > 0 Then
+    vPos := vPos + Length('basic ');
+  End;
  If vPos > 0 Then
   Result := Trim(Copy(Value, vPos, Length(Value)));
  If Trim(Result) <> '' Then
@@ -1467,7 +1494,7 @@ Var
          If vDataRouteList.Count > 0 Then
           Inc(aParamsCount);
          TServerUtils.ParseWebFormsParams (ARequest.ContentFields, Cmd, ARequest.Query,
-                                           vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount);
+                                           vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount, RequestType);
          If DWParams.ItemsString['dwwelcomemessage'] <> Nil Then
           vWelcomeMessage := DecodeStrings(DWParams.ItemsString['dwwelcomemessage'].AsString{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
          If (DWParams.ItemsString['dwaccesstag'] <> Nil) Then
@@ -1604,7 +1631,7 @@ Var
            If vDataRouteList.Count > 0 Then
             Inc(aParamsCount);
            TServerUtils.ParseWebFormsParams (ARequest.ContentFields, Cmd, ARequest.Query,
-                                             vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount);
+                                             vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount, RequestType);
            If DWParams.ItemsString['dwwelcomemessage'] <> Nil Then
             vWelcomeMessage := DecodeStrings(DWParams.ItemsString['dwwelcomemessage'].AsString{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
            If (DWParams.ItemsString['dwaccesstag'] <> Nil) Then
@@ -1977,7 +2004,7 @@ Begin
      vContentType := ARequest.ContentType;
      TServerUtils.ParseWebFormsParams (vRequestHeader, Cmd, ARequest.Query,
                                        vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF},
-                                       DWParams, aParamsCount, 'POST', vContentType);
+                                       DWParams, aParamsCount, rtPost, vContentType);
     End;
   End;
   {$IFNDEF FPC}
@@ -2155,7 +2182,7 @@ Begin
         If vDataRouteList.Count > 0 Then
          Inc(aParamsCount);
         TServerUtils.ParseWebFormsParams (ARequest.ContentFields, Cmd, ARequest.Query,
-                                          vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount);
+                                          vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount, RequestType);
         If DWParams.ItemsString['dwwelcomemessage'] <> Nil Then
          vWelcomeMessage       := DecodeStrings(DWParams.ItemsString['dwwelcomemessage'].AsString{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
         If (DWParams.ItemsString['dwaccesstag'] <> Nil) Then
@@ -2211,7 +2238,7 @@ Begin
        TServerUtils.ParseWebFormsParams (ARequest.QueryFields, vTempCmd,
                                          ARequest.Query,
                                          vUriOptions, vmark, vEncoding,
-                                         DWParams, aParamsCount, ARequest.Method);
+                                         DWParams, aParamsCount, RequestType);
        If ARequest.Query <> '' Then
         Begin
          vTempCmd := vTempCmd + '?' + ARequest.Query;
@@ -2273,7 +2300,7 @@ Begin
        vRequestHeader.Add(Cmd);
        vRequestHeader.Add(ARequest.Query);
        TServerUtils.ParseWebFormsParams (ARequest.ContentFields, Cmd, ARequest.Query,
-                                         vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount);
+                                         vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount, RequestType);
 //       SaveLog; //For Debbug Vars
        If DWParams <> Nil Then
         Begin
@@ -2347,7 +2374,8 @@ Begin
            Inc(aParamsCount);
           TServerUtils.ParseRESTURL (RemoveBackslashCommands(ARequest.PathInfo) + ARequest.Query, vEncoding, vUriOptions, vmark, DWParams, aParamsCount);
           {$ENDIF}
-          If (vUriOptions.ServerEvent = '') And (aurlContext <> '') Then
+          If ((vUriOptions.ServerEvent = '') And (aurlContext <> '')) And
+              (Not (RequestType In [rtGet, rtDelete])) Then
            vUriOptions.ServerEvent := aurlContext;
           vOldMethod := vUriOptions.EventName;
           If DWParams <> Nil Then
@@ -3222,23 +3250,45 @@ Begin
           If (DWParams.ItemsString['dwaccesstag'] <> Nil) Then
            vAccessTag := DecodeStrings(DWParams.ItemsString['dwaccesstag'].AsString{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
           Try
-           {$IFDEF FPC}
-            InitCriticalSection(vCriticalSection);
-            EnterCriticalSection(vCriticalSection);
-           {$ENDIF}
+//           {$IFDEF FPC}
+//            InitCriticalSection(vCriticalSection);
+//            EnterCriticalSection(vCriticalSection);
+//           {$ENDIF}
            vTempServerMethods  := vServerMethod.Create(Nil);
           Finally
-           {$IFDEF FPC}
-            Try
-             LeaveCriticalSection(vCriticalSection);
-             DoneCriticalSection(vCriticalSection);
-            Except
-            End;
-           {$ENDIF}
+//           {$IFDEF FPC}
+//            Try
+//             LeaveCriticalSection(vCriticalSection);
+//             DoneCriticalSection(vCriticalSection);
+//            Except
+//            End;
+//           {$ENDIF}
           End;
           If (vTempServerMethods.ClassType = TServerMethodDatamodule)             Or
                   (vTempServerMethods.ClassType.InheritsFrom(TServerMethodDatamodule)) Then
            Begin
+            If TServerMethodDatamodule(vTempServerMethods).QueuedRequest Then
+             Begin
+              {$IFNDEF FPC}
+               {$IF CompilerVersion > 21}
+                {$IFDEF WINDOWS}
+                 InitializeCriticalSection(vCriticalSection);
+                 EnterCriticalSection(vCriticalSection);
+                {$ELSE}
+                 If Not Assigned(vCriticalSection) Then
+                  vCriticalSection := TCriticalSection.Create;
+                 vCriticalSection.Acquire;
+                {$ENDIF}
+               {$ELSE}
+                If Not Assigned(vCriticalSection)  Then
+                 vCriticalSection := TCriticalSection.Create;
+                vCriticalSection.Acquire;
+               {$IFEND}
+              {$ELSE}
+               InitCriticalSection(vCriticalSection);
+               EnterCriticalSection(vCriticalSection);
+              {$ENDIF}
+             End;
             vServerAuthOptions.CopyServerAuthParams(vRDWAuthOptionParam);
             TServerMethodDatamodule(vTempServerMethods).SetClientWelcomeMessage(vWelcomeMessage);
             If ARequest.Referer = 'ipv6' Then
@@ -4056,6 +4106,35 @@ Begin
        If Assigned(vServerMethod) Then
         If Assigned(vTempServerMethods) Then
          Begin
+          If TServerMethodDatamodule(vTempServerMethods).QueuedRequest Then
+           Begin
+            {$IFNDEF FPC}
+             {$IF CompilerVersion > 21}
+              {$IFDEF WINDOWS}
+               If Assigned(vCriticalSection) Then
+                Begin
+                 LeaveCriticalSection(vCriticalSection);
+                 DeleteCriticalSection(vCriticalSection);
+                End;
+              {$ELSE}
+               If Assigned(vCriticalSection) Then
+                Begin
+                 vCriticalSection.Release;
+//                 FreeAndNil(vCriticalSection);
+                End;
+              {$ENDIF}
+             {$ELSE}
+              If Assigned(vCriticalSection) Then
+               Begin
+                vCriticalSection.Release;
+                FreeAndNil(vCriticalSection);
+               End;
+             {$IFEND}
+            {$ELSE}
+             LeaveCriticalSection(vCriticalSection);
+             DoneCriticalSection(vCriticalSection);
+            {$ENDIF}
+           End;
           Try
            FreeAndNil(vTempServerMethods); //.free;
           Except
@@ -6382,6 +6461,7 @@ Begin
  vHandleRedirects                      := False;
  vPropThreadRequest                    := False;
  vFailOverConnections                  := TFailOverConnections.Create(Self, TRESTDWConnectionServerCP);
+ vPoolerNotFoundMessage                := cPoolerNotFound;
 End;
 
 Destructor  TRESTClientPooler.Destroy;
@@ -7263,7 +7343,7 @@ Var
    On E : Exception Do
     Begin
      Result := False;
-     ResultData := GetPairJSON('NOK', cPoolerNotFound);
+     ResultData := GetPairJSON('NOK', vPoolerNotFoundMessage);
      {Todo: Acrescentado}
      If Assigned(SendParams) then
       FreeAndNil(SendParams);
@@ -7287,12 +7367,12 @@ Var
        ErrorMessage := E.Message;
       {$IFNDEF FPC}
        {$IF Defined(HAS_FMX)}
-        ErrorMessage := cPoolerNotFound;
+        ErrorMessage := vPoolerNotFoundMessage;
        {$ELSE}
-        Raise Exception.Create(cPoolerNotFound);
+        Raise Exception.Create(vPoolerNotFoundMessage);
        {$IFEND}
       {$ELSE}
-       Raise Exception.Create(cPoolerNotFound);
+       Raise Exception.Create(vPoolerNotFoundMessage);
       {$ENDIF}
       End
      Else
@@ -7429,6 +7509,7 @@ Begin
      End;
    End;
  Finally
+  HttpRequest.Disconnect;
   If (vErrorMessage <> '') Then
    Begin
     Result := vErrorMessage;
@@ -10532,17 +10613,6 @@ Var
  vDecoderHeaderList  : TStringList;
  vTempContext        : TDWContext;
  vTempEvent          : TDWEvent;
- {$IFNDEF FPC}
- {$IF CompilerVersion > 21}
- {$IFDEF WINDOWS}
-  vCriticalSection : TRTLCriticalSection;
- {$ELSE}
-  vCriticalSection : TCriticalSection;
- {$ENDIF}
- {$ELSE}
-  vCriticalSection : TCriticalSection;
- {$IFEND}
- {$ENDIF}
  Function ExcludeTag(Value : String) : String;
  Begin
   Result := Value;
@@ -10675,7 +10745,7 @@ Var
                                                                                                {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$IFEND}
                                                                                                {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$ENDIF},
                                             ARequestInfo.QueryParams,
-                                            vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount);
+                                            vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount, RequestType);
          try
           JSONParam                 := TJSONParam.Create(DWParams.Encoding);
           JSONParam.ObjectDirection := odIN;
@@ -10910,9 +10980,6 @@ Begin
  vServerMethod         := Nil;
  aParamsCount          := cParamsCount;
  vUriOptions           := TRESTDWUriOptions.Create;
- {$IFNDEF FPC}
- vCriticalSection      := Nil;
- {$ENDIF}
  {$IF Defined(ANDROID) Or Defined(IOS)}
  vBasePath             := System.IOUtils.TPath.Combine(System.IOUtils.TPath.GetDocumentsPath, '/');
  {$ELSE}
@@ -11153,7 +11220,7 @@ Begin
                                                                                                     {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$IFEND}
                                                                                                     {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$ENDIF},
                                        ARequestInfo.QueryParams,
-                                       vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, aParamsCount, RequestTypeToString(RequestType));
+                                       vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, aParamsCount, RequestType);
       If DWParams <> Nil Then
        Begin
         If (DWParams.ItemsString['dwwelcomemessage']     <> Nil)    Then
@@ -11197,7 +11264,7 @@ Begin
      Begin
       If (RequestType In [rtGet, rtDelete]) Then
        Begin
-        aurlContext := vUriOptions.ServerEvent;
+        aurlContext  := vUriOptions.ServerEvent;
         aParamsCount := cParamsCount;
         If ServerContext <> '' Then
          Inc(aParamsCount);
@@ -11208,6 +11275,19 @@ Begin
                                                                   {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$IFEND}
                                                                   {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$ENDIF}, vEncoding, vUriOptions, vmark{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount);
         vOldMethod := vUriOptions.EventName;
+        If ((vUriOptions.BaseServer = '')   And
+            (vUriOptions.DataUrl    = ''))  And
+           ((vUriOptions.ServerEvent <> '') And
+            (vUriOptions.EventName = ''))   Then
+         vUriOptions.BaseServer := vUriOptions.ServerEvent
+        Else If ((vUriOptions.BaseServer <> '') And
+                 (vUriOptions.DataUrl    = '')) And
+                (vUriOptions.ServerEvent <> '') And
+                 (vServerContext = '')  Then
+         Begin
+          vUriOptions.DataUrl    := vUriOptions.BaseServer;
+          vUriOptions.BaseServer := vUriOptions.ServerEvent;
+         End;
         If DWParams <> Nil Then
          Begin
           If DWParams.ItemsString['dwwelcomemessage']      <> Nil  Then
@@ -11364,7 +11444,7 @@ Begin
                                                                                                        {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$IFEND}
                                                                                                        {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$ENDIF},
                                                     ARequestInfo.QueryParams,
-                                                    vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount);
+                                                    vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount, RequestType);
                 End;
                JSONParam    := TJSONParam.Create(DWParams.Encoding);
                JSONParam.ObjectDirection := odIN;
@@ -11608,7 +11688,7 @@ Begin
                                                                                                    {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$IFEND}
                                                                                                    {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$ENDIF},
                                                 ARequestInfo.QueryParams,
-                                                vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount);
+                                                vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount, RequestType);
              {Alteração feita por Tiago IStuque - 28/12/2018}
              If Assigned(DWParams.ItemsString['dwReadBodyRaw']) And (DWParams.ItemsString['dwReadBodyRaw'].AsString='1') Then
               TServerUtils.ParseBodyRawToDWParam(mb.DataString, vEncoding, DWParams{$IFDEF FPC}, vDatabaseCharSet{$ENDIF})
@@ -11672,7 +11752,7 @@ Begin
                                                                                                              {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$IFEND}
                                                                                                              {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$ENDIF},
                                                           ARequestInfo.QueryParams,
-                                                          vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount);
+                                                          vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount, RequestType);
                       End;
                      JSONParam    := TJSONParam.Create(DWParams.Encoding);
                      JSONParam.ObjectDirection := odIN;
@@ -11993,11 +12073,12 @@ Begin
                                                              {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$IFEND}
                                                              {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$ENDIF});
             vRequestHeader.Add(ARequestInfo.QueryParams);
+
             TServerUtils.ParseWebFormsParams (ARequestInfo.Params, {$IFNDEF FPC}{$IF (DEFINED(OLDINDY))}RemoveBackslashCommands(ARequestInfo.Command)
                                                                                                  {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$IFEND}
                                                                                                  {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$ENDIF},
                                               ARequestInfo.QueryParams,
-                                              vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount);
+                                              vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount, RequestType);
            End;
           {$ELSE}
           If ARequestInfo.FormParams <> '' Then
@@ -12035,7 +12116,7 @@ Begin
                                                                                                    {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$IFEND}
                                                                                                    {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$ENDIF},
                                                 ARequestInfo.QueryParams,
-                                                vUriOptions, vmark, vEncoding, DWParams, aParamsCount);
+                                                vUriOptions, vmark, vEncoding, DWParams, aParamsCount, RequestType);
             End;
           {$ENDIF}
           If (DWParams.ItemsString['dwaccesstag'] <> Nil) Then
@@ -12053,7 +12134,7 @@ Begin
                                                                                                 {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$IFEND}
                                                                                                 {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$ENDIF},
                                              ARequestInfo.QueryParams,
-                                             vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount);
+                                             vUriOptions, vmark, vEncoding{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams, aParamsCount, RequestType);
           {$ELSE}
            vRequestHeader.Add(ARequestInfo.Params.Text);
            vRequestHeader.Add({$IFNDEF FPC}{$IF (DEFINED(OLDINDY))}RemoveBackslashCommands(ARequestInfo.Command)
@@ -12065,10 +12146,11 @@ Begin
                                                                                                  {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$IFEND}
                                                                                                  {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$ENDIF},
                                               ARequestInfo.QueryParams,
-                                              vUriOptions, vmark, vEncoding, DWParams, aParamsCount);
+                                              vUriOptions, vmark, vEncoding, DWParams, aParamsCount, RequestType);
           {$ENDIF}
          End;
-        If (vUriOptions.ServerEvent = '') And (aurlContext <> '') Then
+        If ((vUriOptions.ServerEvent = '') And (aurlContext <> '')) And
+            (Not (RequestType In [rtGet, rtDelete])) Then
          vUriOptions.ServerEvent := aurlContext;
        End;
      End;
@@ -12150,29 +12232,67 @@ Begin
          If (DWParams.ItemsString['dwaccesstag'] <> Nil) Then
           vAccessTag := DecodeStrings(DWParams.ItemsString['dwaccesstag'].AsString{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
          Try
-          {$IFDEF FPC}
-           InitCriticalSection(vCriticalSection);
-           EnterCriticalSection(vCriticalSection);
-          {$ENDIF}
+//          {$IFDEF FPC}
+//           InitCriticalSection(vCriticalSection);
+//           EnterCriticalSection(vCriticalSection);
+//          {$ENDIF}
           vTempServerMethods  := vServerMethod.Create(Nil);
          Finally
-          {$IFDEF FPC}
-           Try
-            LeaveCriticalSection(vCriticalSection);
-            DoneCriticalSection(vCriticalSection);
-           Except
-           End;
-          {$ENDIF}
+//          {$IFDEF FPC}
+//           Try
+//            LeaveCriticalSection(vCriticalSection);
+//            DoneCriticalSection(vCriticalSection);
+//           Except
+//           End;
+//          {$ENDIF}
          End;
          If (vTempServerMethods.ClassType = TServerMethodDatamodule)             Or
             (vTempServerMethods.ClassType.InheritsFrom(TServerMethodDatamodule)) Then
           Begin
+           If TServerMethodDatamodule(vTempServerMethods).QueuedRequest Then
+            Begin
+             {$IFNDEF FPC}
+              {$IF CompilerVersion > 21}
+               {$IFDEF WINDOWS}
+                InitializeCriticalSection(vCriticalSection);
+                EnterCriticalSection(vCriticalSection);
+               {$ELSE}
+                If Not Assigned(vCriticalSection) Then
+                 vCriticalSection := TCriticalSection.Create;
+                vCriticalSection.Acquire;
+               {$ENDIF}
+              {$ELSE}
+               If Not Assigned(vCriticalSection)  Then
+                vCriticalSection := TCriticalSection.Create;
+               vCriticalSection.Acquire;
+              {$IFEND}
+             {$ELSE}
+              InitCriticalSection(vCriticalSection);
+              EnterCriticalSection(vCriticalSection);
+             {$ENDIF}
+            End;
            vServerAuthOptions.CopyServerAuthParams(vRDWAuthOptionParam);
            TServerMethodDatamodule(vTempServerMethods).SetClientWelcomeMessage(vWelcomeMessage);
            If AContext.Connection.Socket.Binding.IPVersion = Id_IPv6 Then
             vIPVersion := 'ipv6';
            TServerMethodDatamodule(vTempServerMethods).SetClientInfo(AContext.Connection.Socket.Binding.PeerIP, vIPVersion,
                                                                      ARequestInfo.UserAgent, vUriOptions.EventName, vUriOptions.ServerEvent, AContext.Connection.Socket.Binding.PeerPort);
+           If (RequestType In [rtGet, rtDelete]) Then
+            Begin
+             If ((vUriOptions.BaseServer = '')   And
+                 (vUriOptions.DataUrl    = ''))  And
+                ((vUriOptions.ServerEvent <> '') And
+                 (vUriOptions.EventName = ''))   Then
+              vUriOptions.BaseServer := vUriOptions.ServerEvent
+             Else If ((vUriOptions.BaseServer <> '') And
+                      (vUriOptions.DataUrl    = '')) And
+                     (vUriOptions.ServerEvent <> '') And
+                      (vServerContext = '')  Then
+              Begin
+               vUriOptions.DataUrl    := vUriOptions.BaseServer;
+               vUriOptions.BaseServer := vUriOptions.ServerEvent;
+              End;
+            End;
            //Novo Lugar para Autenticação
            If ((vCORS) And (vCORSOption <> 'OPTIONS')) Or
                (vServerAuthOptions.AuthorizationOption in [rdwAOBasic, rdwAOBearer, rdwAOToken]) Then
@@ -12417,6 +12537,31 @@ Begin
                                    vTokenValidate := True;
                                    vAuthTokenParam := TRDWAuthOptionTokenServer.Create;
                                    vAuthTokenParam.Assign(TRDWAuthOptionTokenServer(vServerAuthOptions.OptionParams));
+                                  {$IFNDEF FPC}
+                                   {$IF Defined(HAS_FMX)}
+                                    {$IFDEF HAS_UTF8}
+                                     If Assigned({$IF CompilerVersion > 33}AContext.Data{$ELSE}AContext.DataObject{$IFEND}) Then
+                                      vToken       := TRDWAuthRequest({$IF CompilerVersion > 33}AContext.Data{$ELSE}AContext.DataObject{$IFEND}).Token
+                                     Else
+                                      vToken       := ARequestInfo.RawHeaders.Values['Authorization'];
+                                    {$ELSE}
+                                     If Assigned(AContext.Data) Then
+                                      vToken       := TRDWAuthRequest(AContext.Data).Token
+                                     Else
+                                      vToken       := ARequestInfo.RawHeaders.Values['Authorization'];
+                                    {$ENDIF}
+                                   {$ELSE}
+                                    If Assigned(AContext.Data) Then
+                                     vToken       := TRDWAuthRequest(AContext.Data).Token
+                                    Else
+                                     vToken       := ARequestInfo.RawHeaders.Values['Authorization'];
+                                   {$IFEND}
+                                  {$ELSE}
+                                   If Assigned(AContext.Data) Then
+                                    vToken       := TRDWAuthRequest(AContext.Data).Token
+                                   Else
+                                    vToken       := ARequestInfo.RawHeaders.Values['Authorization'];
+                                  {$ENDIF}
                                    If DWParams.ItemsString['RDWParams'] <> Nil Then
                                     Begin
                                      DWParamsD := TDWParams.Create;
@@ -12576,64 +12721,11 @@ Begin
      Try
       If Assigned(vLastRequest) Then
        Begin
-        If Not vMultiCORE Then
-         Begin
-          {$IFNDEF FPC}
-           {$IF CompilerVersion > 21}
-            {$IFDEF WINDOWS}
-             if Not Assigned(vCriticalSection) Then
-              vCriticalSection := TCriticalSection.Create;
-             InitializeCriticalSection(vCriticalSection);
-             EnterCriticalSection(vCriticalSection);
-            {$ELSE}
-             if Not Assigned(vCriticalSection) Then
-              vCriticalSection := TCriticalSection.Create;
-             vCriticalSection.Acquire;
-            {$ENDIF}
-           {$ELSE}
-           if Not Assigned(vCriticalSection) Then
-            vCriticalSection := TCriticalSection.Create;
-           vCriticalSection.Acquire;
-           {$IFEND}
-          {$ELSE}
-           InitCriticalSection(vCriticalSection);
-           EnterCriticalSection(vCriticalSection);
-          {$ENDIF}
-         End;
         Try
          If Assigned(vLastRequest) Then
           vLastRequest(ARequestInfo.UserAgent + sLineBreak +
                       ARequestInfo.RawHTTPCommand);
         Finally
-        If Not vMultiCORE Then
-         Begin
-          {$IFNDEF FPC}
-           {$IF CompilerVersion > 21}
-            {$IFDEF WINDOWS}
-             If Assigned(vCriticalSection) Then
-              Begin
-               LeaveCriticalSection(vCriticalSection);
-               DeleteCriticalSection(vCriticalSection);
-              End;
-            {$ELSE}
-             If Assigned(vCriticalSection) Then
-              Begin
-               vCriticalSection.Release;
-               FreeAndNil(vCriticalSection);
-              End;
-            {$ENDIF}
-           {$ELSE}
-            If Assigned(vCriticalSection) Then
-             Begin
-              vCriticalSection.Release;
-              FreeAndNil(vCriticalSection);
-             End;
-           {$IFEND}
-          {$ELSE}
-           LeaveCriticalSection(vCriticalSection);
-           DoneCriticalSection(vCriticalSection);
-          {$ENDIF}
-         End;
         End;
        End;
       If Assigned(vServerMethod) Then
@@ -12877,6 +12969,35 @@ Begin
        If Assigned(vServerMethod) Then
         If Assigned(vTempServerMethods) Then
          Begin
+          If TServerMethodDatamodule(vTempServerMethods).QueuedRequest Then
+           Begin
+            {$IFNDEF FPC}
+             {$IF CompilerVersion > 21}
+              {$IFDEF WINDOWS}
+               If Assigned(vCriticalSection) Then
+                Begin
+                 LeaveCriticalSection(vCriticalSection);
+                 DeleteCriticalSection(vCriticalSection);
+                End;
+              {$ELSE}
+               If Assigned(vCriticalSection) Then
+                Begin
+                 vCriticalSection.Release;
+//                 FreeAndNil(vCriticalSection);
+                End;
+              {$ENDIF}
+             {$ELSE}
+              If Assigned(vCriticalSection) Then
+               Begin
+                vCriticalSection.Release;
+                FreeAndNil(vCriticalSection);
+               End;
+             {$IFEND}
+            {$ELSE}
+             LeaveCriticalSection(vCriticalSection);
+             DoneCriticalSection(vCriticalSection);
+            {$ENDIF}
+           End;
           Try
            {$IFDEF POSIX} //no linux nao precisa libertar porque é [weak]
            vTempServerMethods.free;
@@ -13119,51 +13240,9 @@ Begin
       End;
       If Assigned(vLastResponse) Then
        Begin
-        If Not vMultiCORE Then
-         Begin
-          {$IFNDEF FPC}
-           {$IF CompilerVersion > 21}
-            {$IFDEF WINDOWS}
-             InitializeCriticalSection(vCriticalSection);
-             EnterCriticalSection(vCriticalSection);
-            {$ELSE}
-             If Not Assigned(vCriticalSection) Then
-              vCriticalSection := TCriticalSection.Create;
-             vCriticalSection.Acquire;
-            {$ENDIF}
-           {$ELSE}
-            If Not Assigned(vCriticalSection)  Then
-             vCriticalSection := TCriticalSection.Create;
-            vCriticalSection.Acquire;
-           {$IFEND}
-          {$ELSE}
-           InitCriticalSection(vCriticalSection);
-           EnterCriticalSection(vCriticalSection);
-          {$ENDIF}
-         End;
         Try
          vLastResponse(vReplyString);
         Finally
-         If Not vMultiCORE Then
-          Begin
-           {$IFNDEF FPC}
-            {$IF CompilerVersion > 21}
-             {$IFDEF WINDOWS}
-              LeaveCriticalSection(vCriticalSection);
-              DeleteCriticalSection(vCriticalSection);
-             {$ELSE}
-              vCriticalSection.Release;
-              FreeAndNil(vCriticalSection);
-             {$ENDIF}
-            {$ELSE}
-              vCriticalSection.Release;
-              FreeAndNil(vCriticalSection);
-            {$IFEND}
-           {$ELSE}
-            LeaveCriticalSection(vCriticalSection);
-            DoneCriticalSection(vCriticalSection);
-           {$ENDIF}
-          End;
         End;
        End;
      Finally
@@ -13397,6 +13476,8 @@ Begin
  HTTPServer.OnConnect            := CustomOnConnect;
  HTTPServer.OnCreatePostStream   := CreatePostStream;
  HTTPServer.OnParseAuthentication := OnParseAuthentication;
+
+
  {$ENDIF}
  vServerAuthOptions              := TRDWServerAuthOptionParams.Create(Self);
  vActive                         := False;
@@ -13408,7 +13489,6 @@ Begin
  vServicePort                    := 8082;
  vForceWelcomeAccess             := False;
  vCORS                           := False;
- vMultiCORE                      := False;
  vPathTraversalRaiseError        := True;
  FRootPath                       := '/';
  vASSLRootCertFile               := '';
@@ -13424,6 +13504,12 @@ End;
 
 Destructor TRESTServicePooler.Destroy;
 Begin
+ {$IFNDEF FPC}
+  {$IF CompilerVersion > 21}
+   If Assigned(vCriticalSection) Then
+    FreeAndNil(vCriticalSection);
+  {$IFEND}
+ {$ENDIF}
  HTTPServer.Active := False;
  FreeAndNil(vProxyOptions);
  FreeAndNil(vCripto);
@@ -13481,13 +13567,15 @@ Begin
       lHandler.SSLOptions.VerifyMode            := vSSLVerifyMode;
       lHandler.SSLOptions.VerifyDepth           := vSSLVerifyDepth;
       lHandler.SSLOptions.RootCertFile          := vASSLRootCertFile;
+      lHandler.SSLOptions.Mode                  := vSSLMode;
+      lHandler.SSLOptions.CipherList            := 'TLSv1:TLSv1.2:SSLv3:!RC4:!NULL-MD5:!NULL-SHA:!NULL-SHA256:!DES-CBC-SHA:!DES-CBC3-SHA:!IDEA-CBC-SHA';
       HTTPServer.IOHandler := lHandler;
      End
     Else
      HTTPServer.IOHandler  := Nil;
     If HTTPServer.Bindings.Count > 0 Then
      HTTPServer.Bindings.Clear;
-    HTTPServer.Bindings.DefaultPort := vServicePort;
+    HTTPServer.Bindings.DefaultPort := ServicePort;
     HTTPServer.DefaultPort          := vServicePort;
     HTTPServer.Active               := True;
    Except
