@@ -9611,7 +9611,7 @@ Var
  vDWRoutes: TDWRoutes;
 Begin
  Result        := False;
- vDefaultPageB  := False;
+ vDefaultPageB := False;
  vRejected     := False;
  Error         := False;
  vTagService   := Result;
@@ -9620,7 +9620,7 @@ Begin
  If (Pooler <> '') And (urlContext = '') Then
   Begin
    urlContext := Pooler;
-   Pooler     := '';
+   //uhmano   Pooler     := '';
   End;
  If ServerMethodsClass <> Nil Then
   Begin
@@ -9629,7 +9629,7 @@ Begin
      If ServerMethodsClass.Components[i] is TDWServerContext Then
       Begin
        If ((LowerCase(urlContext) = LowerCase(TDWServerContext(ServerMethodsClass.Components[i]).BaseContext))) Or
-          ((Trim(TDWServerContext(ServerMethodsClass.Components[i]).BaseContext) = '') And (Pooler = '')        And
+          ((Trim(TDWServerContext(ServerMethodsClass.Components[i]).BaseContext) = '')  {//uhmano And (Pooler = '')}  And
            (TDWServerContext(ServerMethodsClass.Components[i]).ContextList.ContextByName[urlContext] <> Nil))   Then
         Begin
          vRootContext := TDWServerContext(ServerMethodsClass.Components[i]).RootContext;
@@ -9714,6 +9714,15 @@ Begin
                    TDWServerContext(ServerMethodsClass.Components[i]).ContextList.ContextByName[Pooler].OnBeforeRenderer(vBaseHeader, ContentType, vResult, RequestType);
                  End;
                End;
+
+               //uhmano -- inicio  ServerContext
+               if DWParams.ItemsString['ContentType'] <> nil then
+                   ContentType := DWParams.ItemsString['ContentType'].asString;
+
+               if DWParams.ItemsString['StatusCode'] <> nil then
+                   ErrorCode := DWParams.ItemsString['StatusCode'].asInteger;
+               //uhmano -- final
+
              Except
               On E : Exception Do
                Begin
@@ -9866,6 +9875,15 @@ Begin
               Else If Assigned(TDWServerEvents(ServerMethodsClass.Components[i]).Events.EventByName[Pooler].OnReplyEvent) Then
                TDWServerEvents(ServerMethodsClass.Components[i]).Events.EventByName[Pooler].OnReplyEvent(DWParams, vResult);
               JsonMode := TDWServerEvents(ServerMethodsClass.Components[i]).Events.EventByName[Pooler].JsonMode;
+
+              //uhmano -- inicio  ServerEvents
+              if DWParams.ItemsString['ContentType'] <> nil then
+                  ContentType := DWParams.ItemsString['ContentType'].asString;
+
+              if DWParams.ItemsString['StatusCode'] <> nil then
+                  ErrorCode := DWParams.ItemsString['StatusCode'].asInteger;
+              //uhmano -- final
+
              Except
               On E : Exception Do
                Begin
@@ -10771,6 +10789,20 @@ Var
     DWParams.RequestHeaders.Input.Assign(ARequestInfo.RawHeaders);
    tmp := '';
   End;
+
+          //uhmano
+          // remoteIP
+          JSONParam                 := TJSONParam.Create(DWParams.Encoding);
+          JSONParam.ObjectDirection := odIN;
+          JSONParam.ParamName       := 'RemoteIP';
+          {$IFDEF FPC}
+          JSONParam.DatabaseCharSet := vDatabaseCharSet;
+          {$ENDIF}
+          JSONParam.AsString        := ARequestInfo.RemoteIP;
+          DWParams.Add(JSONParam);
+		  //uhmano - final
+
+
  end;
  Procedure MyDecodeAndSetParams(ARequestInfo: TIdHTTPRequestInfo);
  Var
@@ -12069,6 +12101,7 @@ Begin
                                                              {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$ENDIF});
             vRequestHeader.Add(ARequestInfo.QueryParams);
 
+            If Not Assigned(DWParams) Then  //uhmano
             TServerUtils.ParseWebFormsParams (ARequestInfo.Params, {$IFNDEF FPC}{$IF (DEFINED(OLDINDY))}RemoveBackslashCommands(ARequestInfo.Command)
                                                                                                  {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$IFEND}
                                                                                                  {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$ENDIF},
@@ -12125,6 +12158,7 @@ Begin
                                                             {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$IFEND}
                                                             {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$ENDIF});
            vRequestHeader.Add(ARequestInfo.QueryParams);
+           If Not Assigned(DWParams) Then  //uhmano
            TServerUtils.ParseWebFormsParams (ARequestInfo.Params, {$IFNDEF FPC}{$IF (DEFINED(OLDINDY))}RemoveBackslashCommands(ARequestInfo.Command)
                                                                                                 {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$IFEND}
                                                                                                 {$ELSE}RemoveBackslashCommands(ARequestInfo.URI){$ENDIF},
