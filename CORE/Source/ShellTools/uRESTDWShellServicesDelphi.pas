@@ -1,4 +1,4 @@
-unit uRESTDWShellServices;
+unit uRESTDWShellServicesDelphi;
 
 {$I ..\..\..\Source\Includes\uRESTDWPlataform.inc}
 
@@ -26,8 +26,14 @@ unit uRESTDWShellServices;
 interface
 
 Uses
-   SysUtils, Classes, Db, HTTPDefs, LConvEncoding, Variants, uRESTDWComponentEvents, uRESTDWBasicTypes, uRESTDWJSONObject,
-   uRESTDWBasic, uRESTDWBasicDB, uRESTDWParams, uRESTDWMassiveBuffer, uRESTDWBasicClass, uRESTDWComponentBase, uRESTDWTools;
+  {$IF CompilerVersion <= 22}
+   SysUtils, Classes, Db, HTTPApp, Variants, EncdDecd, SyncObjs, uRESTDWComponentEvents, uRESTDWBasicTypes, uRESTDWJSONObject,
+   uRESTDWBasic, uRESTDWBasicDB, uRESTDWParams, uRESTDWMassiveBuffer, uRESTDWBasicClass, uRESTDWComponentBase,
+  {$ELSE}
+   System.SysUtils, System.Classes, Data.Db, Variants, HTTPApp, system.SyncObjs, uRESTDWComponentEvents, uRESTDWBasicTypes, uRESTDWJSONObject,
+   uRESTDWBasic, uRESTDWBasicDB, uRESTDWParams, uRESTDWBasicClass, uRESTDWComponentBase,
+   uRESTDWCharset, uRESTDWConsts,
+  {$IFEND}uRESTDWTools;
 
 Type
  TRESTDWShellService = Class(TRESTShellServicesBase)
@@ -39,8 +45,10 @@ Type
                                       Var InvalidTag          : Boolean);Override;
   Property Active;
  Public
-  Procedure Command                   (ARequest               : TRequest;
-                                       AResponse              : TResponse;
+  Procedure Redirect(Url       : String;
+                     AResponse : TObject);
+  Procedure Command                   (ARequest               : TWebRequest;
+                                       AResponse              : TWebResponse;
                                        Var Handled            : Boolean);
   Constructor Create                (AOwner                   : TComponent);Override;
   Destructor  Destroy;
@@ -51,8 +59,15 @@ Implementation
 
 Uses uRESTDWJSONInterface;
 
-Procedure TRESTDWShellService.Command(ARequest    : TRequest;
-                                      AResponse   : TResponse;
+Procedure TRESTDWShellService.Redirect(Url : String;
+                                       AResponse   : TObject);
+Begin
+ If Trim(Url) <> '' Then
+  TWebResponse(AResponse).SendRedirect(Url);
+End;
+
+Procedure TRESTDWShellService.Command(ARequest    : TWebRequest;
+                                      AResponse   : TWebResponse;
                                       Var Handled : Boolean);
 Var
  sCharSet,
@@ -70,15 +85,27 @@ Var
  vRedirect       : TRedirect;
  Procedure WriteError;
  Begin
-  AResponse.Code                   := StatusCode;
+  AResponse.StatusCode              := StatusCode;
   mb                               := TStringStream.Create(ErrorMessage{$IFNDEF FPC}{$IF CompilerVersion > 21}, TEncoding.UTF8{$IFEND}{$ENDIF});
   mb.Position                      := 0;
-  AResponse.FreeContentStream      := True;
+  {$IFNDEF FPC}
+   {$IF CompilerVersion > 21}
+    AResponse.FreeContentStream      := True;
+   {$IFEND}
+  {$ENDIF}
   AResponse.ContentStream          := mb;
   AResponse.ContentStream.Position := 0;
   AResponse.ContentLength          := mb.Size;
   Handled := True;
-  AResponse.SendResponse;
+  {$IFDEF FPC}
+   AResponse.SendResponse;
+  {$ELSE}
+   AResponse.SendResponse;
+   {$IF CompilerVersion < 21}
+    If Assigned(mb) Then
+     FreeAndNil(mb);
+   {$IFEND}
+  {$ENDIF}
  End;
  Procedure DestroyComponents;
  Begin
@@ -87,38 +114,70 @@ Var
   If Assigned(vStream) Then
    FreeAndNil(vStream);
  End;
- Procedure Redirect(AURL : String);
- Begin
-  If Trim(aUrl) <> '' Then
-   AResponse.SendRedirect(AUrl);
- End;
 Begin
  ResultStream    := TStringStream.Create('');
  vResponseHeader := TStringList.Create;
  vResponseString := '';
  vStream         := Nil;
- vRedirect      := TRedirect(@Redirect);
+ vRedirect       := Redirect;
  Try
   If CORS Then
    Begin
     If CORS_CustomHeaders.Count > 0 Then
      Begin
       For I := 0 To CORS_CustomHeaders.Count -1 Do
-       AResponse.CustomHeaders.AddPair(CORS_CustomHeaders.Names[I], CORS_CustomHeaders.ValueFromIndex[I]);
+       Begin
+        {$IFDEF FPC}
+         AResponse.CustomHeaders.AddPair(CORS_CustomHeaders.Names[I], CORS_CustomHeaders.ValueFromIndex[I]);
+        {$ELSE}
+         {$IF CompilerVersion > 21}
+         AResponse.CustomHeaders.AddPair(CORS_CustomHeaders.Names[I], CORS_CustomHeaders.ValueFromIndex[I]);
+         {$ELSE}
+         AResponse.CustomHeaders.Add(CORS_CustomHeaders.Names[I] + '=' + CORS_CustomHeaders.ValueFromIndex[I]);
+         {$IFEND}
+        {$ENDIF}
+       End;
      End
     Else
-     AResponse.CustomHeaders.AddPair('Access-Control-Allow-Origin','*');
+     Begin
+      {$IFDEF FPC}
+       AResponse.CustomHeaders.AddPair('Access-Control-Allow-Origin','*');
+      {$ELSE}
+       {$IF CompilerVersion > 21}
+       AResponse.CustomHeaders.AddPair('Access-Control-Allow-Origin','*');
+       {$ELSE}
+       AResponse.CustomHeaders.Add('Access-Control-Allow-Origin=*');
+       {$IFEND}
+      {$ENDIF}
+     End;
    End;
-  vAuthRealm := '';//AResponse.Realm;
+  vAuthRealm := AResponse.Realm;
   vToken     := ARequest.Authorization;
   //ARequest.Connection
   vStream    := TMemoryStream.Create;
+ {$IFNDEF FPC}
+  If ARequest.ContentLength > 0 Then
+   Begin
+    {$IF CompilerVersion > 29}
+     ARequest.ReadTotalContent;
+     vStream.Write(TBytes(ARequest.RawContent), Length(ARequest.RawContent));
+    {$ELSE}
+    If (Trim(ARequest.Content) <> '') Then
+     Begin
+      If vStream = Nil Then
+       vStream := TStringStream.Create(ARequest.Content);
+      vStream.Position := 0;
+     End;
+    {$IFEND}
+   End;
+ {$ELSE}
   If (Trim(ARequest.Content) <> '') Then
    Begin
     If vStream = Nil Then
      vStream := TStringStream.Create(ARequest.Content);
     vStream.Position := 0;
    End;
+ {$ENDIF}
   vStream.Position := 0;
   vContentType     := ARequest.ContentType;
   If CommandExec  (TComponent(AResponse),
@@ -127,14 +186,14 @@ Begin
                                                         {$ELSE}RawPathInfo
                                                         {$IFEND}
                                            {$ELSE}
-                                            PathInfo
+                                            RawPathInfo
                                            {$ENDIF},
                    vContentType,
                    ARequest.{$IFNDEF FPC}{$IF CompilerVersion < 21}RemoteAddr
                                           {$ELSE}RemoteIP
                                           {$IFEND}
                             {$ELSE}
-                             RemoteAddr
+                             RemoteIP
                             {$ENDIF},
                    ARequest.UserAgent,
                    '',
@@ -143,7 +202,7 @@ Begin
                    vResponseHeader,
                    -1,
                    Nil,
-                   ARequest.ContentFields,
+                   ARequest.QueryFields,
                    ARequest.QueryFields.Text,
                    vStream,
                    vAuthRealm,
@@ -155,8 +214,9 @@ Begin
                    ResultStream,
                    vRedirect) Then
    Begin
-    //AResponse.Realm   := vAuthRealm;
+    AResponse.Realm       := vAuthRealm;
     AResponse.ContentType := vContentType;
+    {$if CompilerVersion > 21}
      If (sCharSet <> '') Then
       Begin
        If Pos('utf8', Lowercase(sCharSet)) > 0 Then
@@ -170,57 +230,75 @@ Begin
           AResponse.ContentType := AResponse.ContentType + ';charset=ansi';
         End;
       End;
-    AResponse.Code               := StatusCode;
+    {$IFEND}
+    AResponse.StatusCode               := StatusCode;
     If (vResponseString <> '') Or
        (ErrorMessage    <> '') Then
      Begin
       If Assigned(ResultStream) Then
        FreeAndNil(ResultStream);
-      If (vResponseString <> '') Then
-       ResultStream := TStringStream.Create(vResponseString)
+      AResponse.ContentLength          := -1;
+      If ErrorMessage <> '' Then
+       AResponse.ReasonString          := ErrorMessage
       Else
-       ResultStream := TStringStream.Create(ErrorMessage);
+       AResponse.ReasonString          := vResponseString;
+     End
+    Else
+     Begin
+      AResponse.ContentStream          := ResultStream;
+      AResponse.ContentStream.Position := 0;
+      AResponse.ContentLength          := ResultStream.Size;
+      {$IF CompilerVersion > 21}
+       AResponse.FreeContentStream      := True;
+      {$IFEND}
      End;
-    AResponse.ContentStream          := ResultStream;
-    AResponse.ContentStream.Position := 0;
-    AResponse.ContentLength          := ResultStream.Size;
-    AResponse.FreeContentStream      := True;
     For I := 0 To vResponseHeader.Count -1 Do
-     AResponse.CustomHeaders.AddPair(vResponseHeader.Names [I],
-                                     vResponseHeader.Values[vResponseHeader.Names[I]]);
-    AResponse.SendResponse;
+     Begin
+      {$IFNDEF FPC}
+       {$IF CompilerVersion < 21}
+        AResponse.CustomHeaders.Add(vResponseHeader.Names [I] + '=' + vResponseHeader.Values[vResponseHeader.Names[I]]);
+       {$ELSE}
+        AResponse.CustomHeaders.AddPair(vResponseHeader.Names [I],
+                                        vResponseHeader.Values[vResponseHeader.Names[I]]);
+       {$IFEND}
+      {$ELSE}
+       AResponse.CustomHeaders.AddPair(vResponseHeader.Names [I],
+                                       vResponseHeader.Values[vResponseHeader.Names[I]]);
+      {$ENDIF}
+     End;
     Handled := True;
+    {$IFNDEF FPC}
+     AResponse.SendResponse;
+     {$IF CompilerVersion < 21}
+      If Assigned(ResultStream) Then
+       FreeAndNil(ResultStream);
+     {$IFEND}
+    {$ELSE}
+     AResponse.SendResponse;
+    {$ENDIF}
    End
   Else //Tratamento de Erros.
    Begin
-    //AResponse.Realm := vAuthRealm;
-    If (sCharSet <> '') Then
-     Begin
-      If Pos('utf8', Lowercase(sCharSet)) > 0 Then
-       Begin
-        If Pos('utf8', lowercase(AResponse.ContentType)) = 0 Then
-         AResponse.ContentType := AResponse.ContentType + ';charset=utf-8';
-       End
-      Else If Pos('ansi', Lowercase(sCharSet)) > 0 Then
-       Begin
-        If Pos('ansi', lowercase(AResponse.ContentType)) = 0 Then
-         AResponse.ContentType := AResponse.ContentType + ';charset=ansi';
-       End;
-     End;
-   AResponse.Code    := StatusCode;
-   If ErrorMessage <> '' Then
-    Begin
-     If Assigned(ResultStream) Then
-      FreeAndNil(ResultStream);
-     ResultStream := TStringStream.Create(ErrorMessage);
-     AResponse.ContentStream          := ResultStream;
-     AResponse.ContentStream.Position := 0;
-     AResponse.ContentLength          := ResultStream.Size;
-     AResponse.FreeContentStream      := True;
-     AResponse.SendResponse;
-     Handled := True;
-    End;
-  End;
+    AResponse.Realm := vAuthRealm;
+    {$if CompilerVersion > 21}
+     If (sCharSet <> '') Then
+      Begin
+       If Pos('utf8', Lowercase(sCharSet)) > 0 Then
+        Begin
+         If Pos('utf8', lowercase(AResponse.ContentType)) = 0 Then
+          AResponse.ContentType := AResponse.ContentType + ';charset=utf-8';
+        End
+       Else If Pos('ansi', Lowercase(sCharSet)) > 0 Then
+        Begin
+         If Pos('ansi', lowercase(AResponse.ContentType)) = 0 Then
+          AResponse.ContentType := AResponse.ContentType + ';charset=ansi';
+        End;
+      End;
+    {$IFEND}
+    AResponse.StatusCode    := StatusCode;
+    If ErrorMessage <> '' Then
+     AResponse.ReasonString := ErrorMessage;
+   End;
  Finally
   DestroyComponents;
  End;
@@ -242,9 +320,8 @@ Procedure TRESTDWShellService.EchoPooler(ServerMethodsClass,
                                          AccessTag            : String;
                                          Var InvalidTag       : Boolean);
 Begin
- {$IFNDEF FPC}
- Inherited
- {$ENDIF}
+ Inherited;
+
 End;
 
 End.
