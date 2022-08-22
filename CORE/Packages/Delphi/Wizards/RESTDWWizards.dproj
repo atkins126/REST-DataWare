@@ -112,20 +112,20 @@
         <VerInfo_Locale>1033</VerInfo_Locale>
         <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName)</VerInfo_Keys>
         <Debugger_HostApplication>&quot;C:\Program Files (x86)\Embarcadero\Studio\20.0\bin\bds.exe&quot;</Debugger_HostApplication>
+        <DCC_Description>REST Dataware Wizards</DCC_Description>
     </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="RDWSERVER.res"/>
         <DCCReference Include="rtl.dcp"/>
         <DCCReference Include="vcl.dcp"/>
         <DCCReference Include="designide.dcp"/>
         <DCCReference Include="xmlrtl.dcp"/>
         <DCCReference Include="vclactnband.dcp"/>
         <DCCReference Include="vclx.dcp"/>
-        <DCCReference Include="STLWizardreg.pas"/>
-        <RcCompile Include="templates\RDWSERVER.RC">
+        <DCCReference Include="..\..\..\Source\Wizards\STLWizardreg.pas"/>
+        <RcCompile Include="..\..\..\Source\Wizards\templates\RDWSERVER.RC">
             <Form>RDWSERVER.res</Form>
         </RcCompile>
         <BuildConfiguration Include="Debug">
@@ -149,7 +149,8 @@
                     <Source Name="MainSource">RESTDWWizards.dpk</Source>
                 </Source>
                 <Excluded_Packages>
-                    <Excluded_Packages Name="D:\Meus Dados\Projetos\TERCA\Components\ACBr\trunk2\Lib\Delphi\LibD24\ACBr_Integrador.bpl">ACBr - Integrador - (http://www.projetoacbr.com.br/)</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k280.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp280.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
                 </Excluded_Packages>
             </Delphi.Personality>
             <Platforms>
@@ -159,7 +160,7 @@
                 <Platform value="Win64">False</Platform>
             </Platforms>
             <Deployment Version="3">
-                <DeployFile LocalName="C:\Users\Public\Documents\Embarcadero\Studio\18.0\Bpl\RESTDWWizards.bpl" Configuration="Debug" Class="ProjectOutput">
+                <DeployFile LocalName="..\..\..\..\..\..\..\..\Public\Documents\Embarcadero\Studio\22.0\Bpl\RESTDWWizards.bpl" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>RESTDWWizards.bpl</RemoteName>
                         <Overwrite>true</Overwrite>
