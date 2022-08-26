@@ -1855,20 +1855,16 @@ Var
   vTagService   := False;
   If ServerMethodsClass <> Nil Then
    Begin
+    Pooler := urlContext;
+    If Pos('?', Pooler) > 0 Then
+     Pooler := Copy(Pooler, 1, Pos('?', Pooler) -1);
     For I := 0 To ServerMethodsClass.ComponentCount -1 Do
      Begin
       If ServerMethodsClass.Components[i] is TRESTDWServerEvents Then
        Begin
-        Pooler := StringReplace(urlContext, '/', '', [rfReplaceAll]);
-        //If (LowerCase(urlContext) = LowerCase(ServerMethodsClass.Components[i].Name))  Or
-        //   (LowerCase(urlContext) = LowerCase(ServerMethodsClass.classname + '.' +
-        //                                      ServerMethodsClass.Components[i].Name))  Then
-        vTagService := TRESTDWServerEvents(ServerMethodsClass.Components[i]).Events.EventByName[Pooler] <> Nil;
-        If vTagService Then
-         Begin
-          Result   := TRESTDWServerEvents(ServerMethodsClass.Components[i]).Events.EventByName[Pooler];
+        Result   := TRESTDWServerEvents(ServerMethodsClass.Components[i]).Events.EventByName[Pooler];
+        If Assigned(Result) Then
           Break;
-         End;
        End;
      End;
    End;
@@ -1884,11 +1880,12 @@ Var
  Begin
   Result        := Nil;
   vRootContext  := '';
-//  aEventName    := UriOptions.EventName;
-//  aServerEvent  := UriOptions.ServerEvent;
   If (aServerEvent = '') Then
    Begin
-    aServerEvent := StringReplace(urlContext, '/', '', [rfReplaceAll]);
+//    aServerEvent := StringReplace(urlContext, '/', '', [rfReplaceAll]);
+    aServerEvent := urlContext;
+    If Pos('?', aServerEvent) > 0 Then
+     aServerEvent := Copy(aServerEvent, 1, Pos('?', aServerEvent) -1);
     aEventName   := '';
    End;
   If ServerMethodsClass <> Nil Then
@@ -1901,12 +1898,9 @@ Var
             (TRESTDWServerContext(ServerMethodsClass.Components[i]).ContextList.ContextByName[aServerEvent] <> Nil))   Then
          Begin
           vRootContext := TRESTDWServerContext(ServerMethodsClass.Components[i]).DefaultContext;
-          vTagService  := TRESTDWServerContext(ServerMethodsClass.Components[i]).ContextList.ContextByName[aServerEvent] <> Nil;
-          If vTagService Then
-           Begin
-            Result := TRESTDWServerContext(ServerMethodsClass.Components[i]).ContextList.ContextByName[aServerEvent];
-            Break;
-           End;
+          Result := TRESTDWServerContext(ServerMethodsClass.Components[i]).ContextList.ContextByName[aServerEvent];
+          If Assigned(Result) Then
+           Break;
          End;
        End;
      End;
@@ -3079,6 +3073,7 @@ Begin
                             vNeedAuthorization := vTempEvent.NeedAuthorization;
                            If vNeedAuthorization Then
                             Begin
+
                              vAuthenticationString := DecodeStrings(StringReplace(RawHeaders.Values['Authorization'], 'Basic ', '', [rfReplaceAll]){$IFDEF FPC}, vDatabaseCharSet{$ENDIF});; //Authentication.Authentication;// RawHeaders.Values['Authorization'];
                              If (vAuthenticationString <> '') And
                                 ((AuthUsername = '') And (AuthPassword = '')) Then
@@ -3109,6 +3104,8 @@ Begin
                           End;
             rdwAOBearer : Begin
                            vUrlToken := Lowercase(vUrlToExec);
+                           If Copy(vUrlToken, InitStrPos, 1) = '/' then
+                            Delete(vUrlToken, InitStrPos, 1);
                            If vUrlToken =
                               Lowercase(TRESTDWAuthOptionTokenServer(vServerAuthOptions.OptionParams).GetTokenEvent) Then
                             Begin
@@ -6623,7 +6620,6 @@ Begin
  {$ELSE}
  {$ENDIF}
  vServerAuthOptions                     := TRESTDWServerAuthOptionParams.Create(Self);
-// vServerAuthOptions.AuthorizationOption := rdwAONone;
  vActive                                := False;
  vEncoding                              := esUtf8;
  vServicePort                           := 8082;
