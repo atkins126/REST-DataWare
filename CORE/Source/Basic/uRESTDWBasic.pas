@@ -1700,7 +1700,7 @@ Var
   I: Integer;
   JSONParam : TJSONParam;
  begin
-  If RawHeaders = Nil Then
+  If Not Assigned(RawHeaders) Then
    Exit;
   Try
    If RawHeaders.Count > 0 Then
@@ -1787,7 +1787,8 @@ Var
     End;
   Finally
    If RawHeaders <> Nil Then
-    DWParams.RequestHeaders.Input.Assign(RawHeaders);
+    If RawHeaders.Text <> '' Then
+     DWParams.RequestHeaders.Input.Assign(RawHeaders);
    tmp := '';
   End;
  End;
@@ -2250,7 +2251,7 @@ Begin
             mb := TStringStream.Create(''); //{$IFNDEF FPC}{$if CompilerVersion > 21}, TEncoding.UTF8{$IFEND}{$ENDIF});
             try
              mb.CopyFrom(ContentStringStream, ContentStringStream.Size);
-               ContentStringStream.Position := 0;
+                         ContentStringStream.Position := 0;
              mb.Position := 0;
              If (pos('--', mb.DataString) > 0) and (pos('boundary', ContentType) > 0) Then
               Begin

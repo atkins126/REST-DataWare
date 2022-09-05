@@ -1,6 +1,6 @@
 unit uRESTDWShellServicesLazarus;
 
-{$I ..\..\..\Source\Includes\uRESTDWPlataform.inc}
+{$I ..\Includes\uRESTDWPlataform.inc}
 
 {
   REST Dataware .
@@ -27,7 +27,8 @@ interface
 
 Uses
    SysUtils, Classes, Db, HTTPDefs, LConvEncoding, Variants, uRESTDWComponentEvents, uRESTDWBasicTypes, uRESTDWJSONObject,
-   uRESTDWBasic, uRESTDWBasicDB, uRESTDWParams, uRESTDWMassiveBuffer, uRESTDWBasicClass, uRESTDWComponentBase, uRESTDWTools;
+   uRESTDWBasic, uRESTDWBasicDB, uRESTDWParams, uRESTDWMassiveBuffer, uRESTDWBasicClass, uRESTDWComponentBase, uRESTDWTools,
+   uRESTDWConsts;
 
 Type
  TRESTDWShellService = Class(TRESTShellServicesBase)
@@ -64,6 +65,7 @@ Var
  I,
  StatusCode      : Integer;
  ResultStream    : TStream;
+ vRawHeader,
  vResponseHeader : TStringList;
  mb              : TStringStream;
  vStream         : TStream;
@@ -84,6 +86,8 @@ Var
  Begin
   If Assigned(vResponseHeader) Then
    FreeAndNil(vResponseHeader);
+  If Assigned(vRawHeader) Then
+   FreeAndNil(vRawHeader);
   If Assigned(vStream) Then
    FreeAndNil(vStream);
  End;
@@ -111,7 +115,19 @@ Begin
    End;
   vAuthRealm := '';//AResponse.Realm;
   vToken     := ARequest.Authorization;
-  //ARequest.Connection
+  vRawHeader := Nil;
+  If Assigned(ARequest.CustomHeaders) Then
+   Begin
+    vRawHeader      := TStringList.Create;
+    vRawHeader.Text := ARequest.CustomHeaders.Text;
+   end;
+  If vToken <> '' Then
+   Begin
+    If Not Assigned(vRawHeader) Then
+     vRawHeader := TStringList.Create;
+    If vRawHeader.IndexOf('Authorization:') = -1 Then
+     vRawHeader.Add('Authorization:' + vToken);
+   End;
   vStream    := TMemoryStream.Create;
   If (Trim(ARequest.Content) <> '') Then
    Begin
@@ -142,7 +158,7 @@ Begin
                    vToken,
                    vResponseHeader,
                    -1,
-                   ARequest.CustomHeaders,
+                   vRawHeader,
                    ARequest.ContentFields,
                    ARequest.QueryFields.Text,
                    vStream,
@@ -241,10 +257,40 @@ Procedure TRESTDWShellService.EchoPooler(ServerMethodsClass,
                                          Var Pooler, MyIP     : String;
                                          AccessTag            : String;
                                          Var InvalidTag       : Boolean);
+Var
+ I : Integer;
 Begin
  {$IFNDEF FPC}
- Inherited
+ Inherited;
  {$ENDIF}
+ InvalidTag := False;
+ MyIP       := '';
+ If ServerMethodsClass <> Nil Then
+  Begin
+   For I := 0 To ServerMethodsClass.ComponentCount -1 Do
+    Begin
+     If (ServerMethodsClass.Components[i].ClassType  = TRESTDWPoolerDB)  Or
+        (ServerMethodsClass.Components[i].InheritsFrom(TRESTDWPoolerDB)) Then
+      Begin
+       If Pooler = Format('%s.%s', [ServerMethodsClass.ClassName, ServerMethodsClass.Components[i].Name]) Then
+        Begin
+         If Trim(TRESTDWPoolerDB(ServerMethodsClass.Components[i]).AccessTag) <> '' Then
+          Begin
+           If TRESTDWPoolerDB(ServerMethodsClass.Components[i]).AccessTag <> AccessTag Then
+            Begin
+             InvalidTag := True;
+             Exit;
+            End;
+          End;
+         If AContext <> Nil Then
+          MyIP := TRequest(AContext).RemoteAddr;
+         Break;
+        End;
+      End;
+    End;
+  End;
+ If MyIP = '' Then
+  Raise Exception.Create(cInvalidPoolerName);
 End;
 
 End.

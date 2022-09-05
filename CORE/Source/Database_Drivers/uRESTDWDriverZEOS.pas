@@ -1,4 +1,4 @@
-unit uRESTDWDriverZEOS;
+﻿unit uRESTDWDriverZEOS;
 
 interface
 
@@ -132,8 +132,6 @@ Type
   Property Connection : TZConnection Read GetConnection Write SetConnection;
 End;
 
-
-
 Procedure Register;
 
 implementation
@@ -146,7 +144,7 @@ implementation
 
 Procedure Register;
 Begin
- RegisterComponents('REST Dataware - Drivers', [TRESTDWDriverZeos]);
+ RegisterComponents('REST Dataware - Drivers', [TRESTDWDriverZEOS]);
 End;
 
 Function TRESTDWDriverZeos.ProcessMassiveSQLCache(MassiveSQLCache      : String;
