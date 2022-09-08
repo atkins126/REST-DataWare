@@ -29,12 +29,12 @@ Uses
   {$IF CompilerVersion <= 22}
    EncdDecd, uRESTDWMassiveBuffer,
   {$ELSE}
-     uRESTDWCharset, uRESTDWConsts,
+     uRESTDWCharset,
   {$IFEND}
   SysUtils, Classes, Db, Variants, HTTPApp, SyncObjs,
   uRESTDWBasic, uRESTDWJSONObject, uRESTDWBasicTypes, uRESTDWComponentEvents,
   uRESTDWComponentBase, uRESTDWBasicClass, uRESTDWParams, uRESTDWBasicDB,
-  uRESTDWTools;
+  uRESTDWTools, uRESTDWConsts;
 
 Type
  TRESTDWShellService = Class(TRESTShellServicesBase)
@@ -46,8 +46,8 @@ Type
                                       Var InvalidTag          : Boolean);Override;
   Property Active;
  Public
-  Procedure Redirect(Url       : String;
-                     AResponse : TObject);
+  Procedure Redirect                  (Url                    : String;
+                                       AResponse              : TObject);
   Procedure Command                   (ARequest               : TWebRequest;
                                        AResponse              : TWebResponse;
                                        Var Handled            : Boolean);
@@ -270,8 +270,16 @@ Begin
       End;
     {$IFEND}
     AResponse.StatusCode    := StatusCode;
-    If ErrorMessage <> '' Then
-     AResponse.ReasonString := ErrorMessage;
+    If AResponse.StatusCode <> 200 Then
+     Begin
+      If ErrorMessage <> '' Then
+       AResponse.ReasonString := ErrorMessage
+      Else
+       Begin
+        AResponse.ReasonString := TStringStream(ResultStream).DataString;
+        FreeAndNil(ResultStream);
+       End;
+     End;
    End;
  Finally
   DestroyComponents;
@@ -317,7 +325,11 @@ Begin
             End;
           End;
          If AContext <> Nil Then
-          MyIP := TWebRequest(AContext).RemoteAddr;
+          Begin
+           MyIP := TWebRequest(AContext).RemoteAddr;
+           If MyIP = '' Then
+            MyIP := '127.0.0.1';
+          End;
          Break;
         End;
       End;
