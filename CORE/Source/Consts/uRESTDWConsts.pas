@@ -59,6 +59,9 @@ Type
  TRESTDWMaxLineAction      = (maException, maSplit);
  TRESTDWOSType             = (otUnknown, otUnix, otWindows, otDotNet);
  TRESTDWIPVersion          = (Id_IPv4, Id_IPv6);
+ TRESTDWSSLVersion         = (sslvSSLv2, sslvSSLv23,  sslvSSLv3,
+                              sslvTLSv1, sslvTLSv1_1, sslvTLSv1_2);
+ TRESTDWSSLVersions        = set of TRESTDWSSLVersion;
 
 Const
  tScriptsDetected           : Array[0..1] of string = ('.map', '.webdwpc');
@@ -132,7 +135,7 @@ Const
  MinutesInHour              = 60;     {Number of minutes in an hour}
  MinutesInDay               = 1440;   {Number of minutes in a day}
  AssyncCommandMSG           = '{"status":"OK", "assyncmsg":"AssyncCommand Executed"}';
- cNameValueSeparator        = '=';
+ cNameValueSeparator        = ':';
  RESTDWDialogoTitulo        = 'REST DataWare Components';
  RESTDWSobreTitulo          = 'REST DataWare '+ RESTDWVersao;
  RESTDWSobreDescricao       = 'https://github.com/OpenSourceCommunityBrasil/REST-DataWare' + sLineBreak +
@@ -161,6 +164,7 @@ Const
  cInvalidDWParams           = 'Invalid RESTDWParams';
  cParamNotFound             = 'Param %s not found...';
  cInvalidPoolerName         = 'Invalid Pooler Name...';
+ cInvalidBlankPooler        = 'Invalid Pooler Name: Pooler is blank';
  cInvalidContextRule        = 'Invalid ContextRule Name';
  cServerEventNotFound       = 'ServerEvent not found...';
  cStreamReadError           = 'Stream Error %s %s';

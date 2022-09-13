@@ -5,23 +5,25 @@ unit uRESTDWShellServicesDelphi;
 {
   REST Dataware .
   Criado por XyberX (Gilbero Rocha da Silva), o REST Dataware tem como objetivo o uso de REST/JSON
- de maneira simples, em qualquer Compilador Pascal (Delphi, Lazarus e outros...).
+  de maneira simples, em qualquer Compilador Pascal (Delphi, Lazarus e outros...).
   O REST Dataware também tem por objetivo levar componentes compatíveis entre o Delphi e outros Compiladores
- Pascal e com compatibilidade entre sistemas operacionais.
+  Pascal e com compatibilidade entre sistemas operacionais.
   Desenvolvido para ser usado de Maneira RAD, o REST Dataware tem como objetivo principal você usuário que precisa
- de produtividade e flexibilidade para produção de Serviços REST/JSON, simplificando o processo para você programador.
+  de produtividade e flexibilidade para produção de Serviços REST/JSON, simplificando o processo para você programador.
 
- Membros do Grupo :
+  Membros do Grupo :
 
- XyberX (Gilberto Rocha)    - Admin - Criador e Administrador  do pacote.
- Alexandre Abbade           - Admin - Administrador do desenvolvimento de DEMOS, coordenador do Grupo.
- Anderson Fiori             - Admin - Gerencia de Organização dos Projetos
- Flávio Motta               - Member Tester and DEMO Developer.
- Mobius One                 - Devel, Tester and Admin.
- Gustavo                    - Criptografia and Devel.
- Eloy                       - Devel.
- Roniery                    - Devel.
+  XyberX (Gilberto Rocha)    - Admin - Criador e Administrador  do pacote.
+  A. Brito                   - Admin - Administrador do desenvolvimento.
+  Alexandre Abbade           - Admin - Administrador do desenvolvimento de DEMOS, coordenador do Grupo.
+  Anderson Fiori             - Admin - Gerencia de Organização dos Projetos
+  Flávio Motta               - Member Tester and DEMO Developer.
+  Mobius One                 - Devel, Tester and Admin.
+  Gustavo                    - Criptografia and Devel.
+  Eloy                       - Devel.
+  Roniery                    - Devel.
 }
+
 
 interface
 
@@ -90,7 +92,7 @@ Var
   AResponse.StatusCode              := StatusCode;
   mb                               := TStringStream.Create(ErrorMessage{$IFNDEF FPC}{$IF CompilerVersion > 21}, TEncoding.UTF8{$IFEND}{$ENDIF});
   mb.Position                      := 0;
-   {$IF CompilerVersion > 21}
+   {$IF CompilerVersion > 23}
     AResponse.FreeContentStream      := True;
    {$IFEND}
   AResponse.ContentStream          := mb;
@@ -118,7 +120,7 @@ Begin
  vResponseString := '';
  vStream         := Nil;
  vRedirect       := Redirect;
- {$IF CompilerVersion > 21}
+ {$IF CompilerVersion > 23}
   ARequest.ReadTotalContent;
  {$IFEND}
  Try
@@ -128,26 +130,25 @@ Begin
      Begin
       For I := 0 To CORS_CustomHeaders.Count -1 Do
        Begin
-         {$IF CompilerVersion > 21}
+         {$IF CompilerVersion > 23}
          AResponse.CustomHeaders.AddPair(CORS_CustomHeaders.Names[I], CORS_CustomHeaders.ValueFromIndex[I]);
          {$ELSE}
-         AResponse.CustomHeaders.Add(CORS_CustomHeaders.Names[I] + '=' + CORS_CustomHeaders.ValueFromIndex[I]);
+         AResponse.CustomHeaders.Add(CORS_CustomHeaders.Names[I] + cNameValueSeparator + CORS_CustomHeaders.ValueFromIndex[I]);
          {$IFEND}
        End;
      End
     Else
      Begin
-       {$IF CompilerVersion > 21}
+       {$IF CompilerVersion > 23}
        AResponse.CustomHeaders.AddPair('Access-Control-Allow-Origin','*');
        {$ELSE}
-       AResponse.CustomHeaders.Add('Access-Control-Allow-Origin=*');
+       AResponse.CustomHeaders.Add('Access-Control-Allow-Origin' + cNameValueSeparator '*');
        {$IFEND}
      End;
    End;
   vAuthRealm := AResponse.Realm;
   vToken     := ARequest.Authorization;
   //ARequest.Connection
-  vStream    := TMemoryStream.Create;
   vRawHeader := TStringList.Create;
   If vToken <> '' Then
    vRawHeader.Add('Authorization:' + vToken);
@@ -155,6 +156,7 @@ Begin
    Begin
     {$IF CompilerVersion > 29}
      ARequest.ReadTotalContent;
+     vStream    := TMemoryStream.Create;
      vStream.Write(TBytes(ARequest.RawContent), Length(ARequest.RawContent));
     {$ELSE}
     If (Trim(ARequest.Content) <> '') Then
@@ -231,14 +233,14 @@ Begin
       AResponse.ContentStream          := ResultStream;
       AResponse.ContentStream.Position := 0;
       AResponse.ContentLength          := ResultStream.Size;
-      {$IF CompilerVersion > 21}
+      {$IF CompilerVersion > 23}
        AResponse.FreeContentStream      := True;
       {$IFEND}
      End;
     For I := 0 To vResponseHeader.Count -1 Do
      Begin
-       {$IF CompilerVersion < 21}
-        AResponse.CustomHeaders.Add(vResponseHeader.Names [I] + '=' + vResponseHeader.Values[vResponseHeader.Names[I]]);
+       {$IF CompilerVersion < 24}
+        AResponse.CustomHeaders.Add(vResponseHeader.Names[I] + cNameValueSeparator + vResponseHeader.Values[vResponseHeader.Names[I]]);
        {$ELSE}
         AResponse.CustomHeaders.AddPair(vResponseHeader.Names [I],
                                         vResponseHeader.Values[vResponseHeader.Names[I]]);

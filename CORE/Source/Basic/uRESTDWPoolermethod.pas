@@ -76,6 +76,7 @@ Uses {$IFDEF FPC}
    vRedirectMaximum        : Integer;
    vOnBeforeGetToken       : TOnBeforeGetToken;
    vActualClientPoolerExec : TRESTClientPoolerBase;
+   vSSLVersions            : TRESTDWSSLVersions;
    Procedure SetOnWork     (Value : TOnWork);
    Procedure SetOnWorkBegin(Value : TOnWork);
    Procedure SetOnWorkEnd  (Value : TOnWorkEnd);
@@ -146,7 +147,19 @@ Uses {$IFDEF FPC}
                                    TimeOut                 : Integer = 3000;
                                    ConnectTimeOut          : Integer = 3000;
                                    ConnectionDefs          : TObject           = Nil;
-                                   RESTClientPooler        : TRESTClientPoolerBase = Nil)   : String;
+                                   RESTClientPooler        : TRESTClientPoolerBase = Nil)   : String;Overload;
+   Function OpenDatasets          (DatasetStream           : TStream;
+                                   Pooler,
+                                   Method_Prefix           : String;
+                                   Var Error               : Boolean;
+                                   Var MessageError        : String;
+                                   Var SocketError         : Boolean;
+                                   BinaryRequest           : Boolean;
+                                   BinaryCompatibleMode    : Boolean;
+                                   TimeOut                 : Integer = 3000;
+                                   ConnectTimeOut          : Integer = 3000;
+                                   ConnectionDefs          : TObject           = Nil;
+                                   RESTClientPooler        : TRESTClientPoolerBase = Nil)   : TStream;Overload;
    Function ApplyUpdates          (Massive                 : TMassiveDatasetBuffer;
                                    Pooler, Method_Prefix,
                                    SQL                     : String;
@@ -357,6 +370,7 @@ Uses {$IFDEF FPC}
    Property AuthenticationOptions : TRESTDWClientAuthOptionParams Read vAuthOptionParams      Write SetAuthOptionParams;
    Property OnBeforeGetToken      : TOnBeforeGetToken          Read vOnBeforeGetToken      Write vOnBeforeGetToken;
    Property PoolerNotFoundMessage : String                     Read vPoolerNotFoundMessage Write vPoolerNotFoundMessage;
+   Property SSLVersions           : TRESTDWSSLVersions         Read vSSLVersions             Write vSSLVersions;
   End;
 
 implementation
@@ -407,7 +421,7 @@ Begin
  RESTClientPoolerExec.PoolerNotFoundMessage := PoolerNotFoundMessage;
  RESTClientPoolerExec.UserAgent        := vUserAgent;
  RESTClientPoolerExec.WelcomeMessage   := vWelcomeMessage;
-// RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
+ RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
  RESTClientPoolerExec.RedirectMaximum  := vRedirectMaximum;
  RESTClientPoolerExec.Host             := Host;
  RESTClientPoolerExec.Port             := Port;
@@ -602,7 +616,7 @@ Begin
  RESTClientPoolerExec.PoolerNotFoundMessage := PoolerNotFoundMessage;
  RESTClientPoolerExec.UserAgent        := vUserAgent;
  RESTClientPoolerExec.WelcomeMessage   := vWelcomeMessage;
-// RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
+ RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
  RESTClientPoolerExec.RedirectMaximum  := vRedirectMaximum;
  RESTClientPoolerExec.Host             := Host;
  RESTClientPoolerExec.Port             := Port;
@@ -970,7 +984,7 @@ Begin
  RESTClientPoolerExec.WelcomeMessage   := vWelcomeMessage;
  RESTClientPoolerExec.Host             := Host;
  RESTClientPoolerExec.Port             := Port;
-// RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
+ RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
  RESTClientPoolerExec.RedirectMaximum  := vRedirectMaximum;
  RESTClientPoolerExec.AuthenticationOptions.Assign(AuthenticationOptions);
  RESTClientPoolerExec.RequestTimeOut   := TimeOut;
@@ -1124,7 +1138,7 @@ Begin
  RESTClientPoolerExec.WelcomeMessage   := vWelcomeMessage;
  RESTClientPoolerExec.Host             := Host;
  RESTClientPoolerExec.Port             := Port;
-// RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
+ RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
  RESTClientPoolerExec.RedirectMaximum  := vRedirectMaximum;
  RESTClientPoolerExec.RequestTimeOut   := TimeOut;
  RESTClientPoolerExec.ConnectTimeOut   := ConnectTimeOut;
@@ -1309,7 +1323,7 @@ Begin
  vActualClientPoolerExec := RESTClientPoolerExec;
  RESTClientPoolerExec.PoolerNotFoundMessage := PoolerNotFoundMessage;
  RESTClientPoolerExec.WelcomeMessage  := vWelcomeMessage;
-// RESTClientPoolerExec.HandleRedirects := vHandleRedirects;
+ RESTClientPoolerExec.HandleRedirects := vHandleRedirects;
  RESTClientPoolerExec.RedirectMaximum := vRedirectMaximum;
  RESTClientPoolerExec.Host            := Host;
  RESTClientPoolerExec.Port            := Port;
@@ -1441,7 +1455,7 @@ Begin
  RESTClientPoolerExec.UserAgent          := vUserAgent;
  RESTClientPoolerExec.RequestTimeOut     := TimeOut;
  RESTClientPoolerExec.ConnectTimeOut     := ConnectTimeOut;
-// RESTClientPoolerExec.HandleRedirects    := vHandleRedirects;
+ RESTClientPoolerExec.HandleRedirects    := vHandleRedirects;
  RESTClientPoolerExec.RedirectMaximum    := vRedirectMaximum;
  RESTClientPoolerExec.OnWork             := vOnWork;
  RESTClientPoolerExec.OnWorkBegin        := vOnWorkBegin;
@@ -1546,7 +1560,7 @@ Begin
  RESTClientPoolerExec.WelcomeMessage   := vWelcomeMessage;
  RESTClientPoolerExec.Host             := Host;
  RESTClientPoolerExec.Port             := Port;
-// RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
+ RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
  RESTClientPoolerExec.RedirectMaximum  := vRedirectMaximum;
  RESTClientPoolerExec.RequestTimeOut   := TimeOut;
  RESTClientPoolerExec.ConnectTimeOut   := ConnectTimeOut;
@@ -1745,7 +1759,7 @@ Begin
  RESTClientPoolerExec.WelcomeMessage   := vWelcomeMessage;
  RESTClientPoolerExec.Host             := Host;
  RESTClientPoolerExec.Port             := Port;
-// RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
+ RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
  RESTClientPoolerExec.RedirectMaximum  := vRedirectMaximum;
  RESTClientPoolerExec.RequestTimeOut   := TimeOut;
  RESTClientPoolerExec.ConnectTimeOut   := ConnectTimeOut;
@@ -1950,7 +1964,7 @@ Begin
  RESTClientPoolerExec.WelcomeMessage   := vWelcomeMessage;
  RESTClientPoolerExec.Host             := Host;
  RESTClientPoolerExec.Port             := Port;
-// RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
+ RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
  RESTClientPoolerExec.RedirectMaximum  := vRedirectMaximum;
  RESTClientPoolerExec.RequestTimeOut   := TimeOut;
  RESTClientPoolerExec.ConnectTimeOut   := ConnectTimeOut;
@@ -2167,7 +2181,7 @@ Begin
  RESTClientPoolerExec.WelcomeMessage   := vWelcomeMessage;
  RESTClientPoolerExec.Host             := Host;
  RESTClientPoolerExec.Port             := Port;
-// RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
+ RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
  RESTClientPoolerExec.RedirectMaximum  := vRedirectMaximum;
  RESTClientPoolerExec.RequestTimeOut   := TimeOut;
  RESTClientPoolerExec.ConnectTimeOut   := ConnectTimeOut;
@@ -2764,7 +2778,7 @@ Begin
  RESTClientPoolerExec.WelcomeMessage   := vWelcomeMessage;
  RESTClientPoolerExec.Host             := Host;
  RESTClientPoolerExec.Port             := Port;
-// RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
+ RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
  RESTClientPoolerExec.RedirectMaximum  := vRedirectMaximum;
  RESTClientPoolerExec.RequestTimeOut   := TimeOut;
  RESTClientPoolerExec.ConnectTimeOut   := ConnectTimeOut;
@@ -2928,7 +2942,7 @@ Begin
  RESTClientPoolerExec.WelcomeMessage   := vWelcomeMessage;
  RESTClientPoolerExec.Host             := Host;
  RESTClientPoolerExec.Port             := Port;
-// RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
+ RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
  RESTClientPoolerExec.RedirectMaximum  := vRedirectMaximum;
  RESTClientPoolerExec.RequestTimeOut   := TimeOut;
  RESTClientPoolerExec.ConnectTimeOut   := ConnectTimeOut;
@@ -3116,8 +3130,8 @@ Begin
  RESTClientPoolerExec.Host            := Host;
  RESTClientPoolerExec.Port            := Port;
  RESTClientPoolerExec.RequestTimeOut  := TimeOut;
- RESTClientPoolerExec.ConnectTimeOut   := ConnectTimeOut;
-// RESTClientPoolerExec.HandleRedirects := vHandleRedirects;
+ RESTClientPoolerExec.ConnectTimeOut  := ConnectTimeOut;
+ RESTClientPoolerExec.HandleRedirects := vHandleRedirects;
  RESTClientPoolerExec.RedirectMaximum := vRedirectMaximum;
  RESTClientPoolerExec.DataCompression := Compression;
  RESTClientPoolerExec.TypeRequest     := vtyperequest;
@@ -3323,7 +3337,7 @@ Begin
  RESTClientPoolerExec.WelcomeMessage   := vWelcomeMessage;
  RESTClientPoolerExec.Host             := Host;
  RESTClientPoolerExec.Port             := Port;
-// RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
+ RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
  RESTClientPoolerExec.RedirectMaximum  := vRedirectMaximum;
  RESTClientPoolerExec.RequestTimeOut   := TimeOut;
  RESTClientPoolerExec.ConnectTimeOut   := ConnectTimeOut;
@@ -3477,7 +3491,7 @@ Begin
  RESTClientPoolerExec.WelcomeMessage   := vWelcomeMessage;
  RESTClientPoolerExec.Host             := Host;
  RESTClientPoolerExec.Port             := Port;
-// RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
+ RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
  RESTClientPoolerExec.RedirectMaximum  := vRedirectMaximum;
  RESTClientPoolerExec.RequestTimeOut   := TimeOut;
  RESTClientPoolerExec.ConnectTimeOut   := ConnectTimeOut;
@@ -3631,7 +3645,7 @@ Begin
    RESTClientPoolerExec.WelcomeMessage   := vWelcomeMessage;
    RESTClientPoolerExec.Host             := Host;
    RESTClientPoolerExec.Port             := Port;
-//   RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
+   RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
    RESTClientPoolerExec.RedirectMaximum  := vRedirectMaximum;
    RESTClientPoolerExec.RequestTimeOut   := TimeOut;
    RESTClientPoolerExec.ConnectTimeOut   := ConnectTimeOut;
@@ -3740,16 +3754,189 @@ Begin
   End;
 End;
 
+Function TRESTDWPoolerMethodClient.OpenDatasets(DatasetStream           : TStream;
+                                                Pooler,
+                                                Method_Prefix           : String;
+                                                Var Error               : Boolean;
+                                                Var MessageError        : String;
+                                                Var SocketError         : Boolean;
+                                                BinaryRequest           : Boolean;
+                                                BinaryCompatibleMode    : Boolean;
+                                                TimeOut                 : Integer = 3000;
+                                                ConnectTimeOut          : Integer = 3000;
+                                                ConnectionDefs          : TObject               = Nil;
+                                                RESTClientPooler        : TRESTClientPoolerBase = Nil) : TStream;
+Var
+ RESTClientPoolerExec : TRESTClientPoolerBase;
+ JSONParam            : TJSONParam;
+ DWParams             : TRESTDWParams;
+ vResult              : String;
+Begin
+ Result := Nil;
+ If Assigned(DatasetStream) Then
+  Begin
+   If Not Assigned(RESTClientPooler) Then
+    RESTClientPoolerExec  := TRESTClientPoolerBase.Create(Nil)
+   Else
+    Begin
+     RESTClientPoolerExec := RESTClientPooler;
+     DataRoute            := RESTClientPoolerExec.DataRoute;
+     AuthenticationOptions.Assign(RESTClientPoolerExec.AuthenticationOptions);
+     vCripto.Use          := RESTClientPoolerExec.CriptOptions.Use;
+     vCripto.Key          := RESTClientPoolerExec.CriptOptions.Key;
+     vtyperequest         := RESTClientPoolerExec.TypeRequest;
+     If Trim(DataRoute) = '' Then
+      Begin
+       If Trim(Method_Prefix) <> '' Then
+        Begin
+         RESTClientPoolerExec.DataRoute := Method_Prefix;
+         DataRoute                      := Method_Prefix;
+        End;
+      End;
+    End;
+   vActualClientPoolerExec := RESTClientPoolerExec;
+   RESTClientPoolerExec.PoolerNotFoundMessage := PoolerNotFoundMessage;
+   RESTClientPoolerExec.AuthenticationOptions.Assign(AuthenticationOptions);
+   RESTClientPoolerExec.UserAgent        := vUserAgent;
+   RESTClientPoolerExec.WelcomeMessage   := vWelcomeMessage;
+   RESTClientPoolerExec.Host             := Host;
+   RESTClientPoolerExec.Port             := Port;
+   RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
+   RESTClientPoolerExec.RedirectMaximum  := vRedirectMaximum;
+   RESTClientPoolerExec.RequestTimeOut   := TimeOut;
+   RESTClientPoolerExec.ConnectTimeOut   := ConnectTimeOut;
+   RESTClientPoolerExec.DataCompression  := vCompression;
+   RESTClientPoolerExec.TypeRequest      := vtyperequest;
+   RESTClientPoolerExec.TypeRequest      := vtyperequest;
+   RESTClientPoolerExec.OnWork           := vOnWork;
+   RESTClientPoolerExec.OnWorkBegin      := vOnWorkBegin;
+   RESTClientPoolerExec.OnWorkEnd        := vOnWorkEnd;
+   RESTClientPoolerExec.OnStatus         := vOnStatus;
+   RESTClientPoolerExec.Encoding         := vEncoding;
+   RESTClientPoolerExec.EncodedStrings   := EncodeStrings;
+   RESTClientPoolerExec.CriptOptions.Use := vCripto.Use;
+   RESTClientPoolerExec.CriptOptions.Key := vCripto.Key;
+   RESTClientPoolerExec.DataRoute        := DataRoute;
+   RESTClientPoolerExec.SetAccessTag(vAccessTag);
+   {$IFDEF FPC}
+   RESTClientPoolerExec.DatabaseCharSet  := vDatabaseCharSet;
+   {$ENDIF}
+   DWParams                              := TRESTDWParams.Create;
+   DWParams.Encoding                     := RESTClientPoolerExec.Encoding;
+   JSONParam                             := TJSONParam.Create(RESTClientPoolerExec.Encoding);
+   JSONParam.ParamName                   := 'DatasetStream';
+   JSONParam.ObjectDirection             := odIn;
+   JSONParam.ObjectValue                 := ovBlob;
+   JSONParam.LoadFromStream(DatasetStream);
+   DWParams.Add(JSONParam);
+   JSONParam                             := TJSONParam.Create(RESTClientPoolerExec.Encoding);
+   JSONParam.ParamName                   := 'Pooler';
+   JSONParam.ObjectDirection             := odIn;
+   If RESTClientPoolerExec.CriptOptions.Use Then
+    JSONParam.AsString                   := RESTClientPoolerExec.CriptOptions.Encrypt(Pooler)
+   Else
+    JSONParam.AsString                   := Pooler;
+   DWParams.Add(JSONParam);
+   JSONParam                             := TJSONParam.Create(RESTClientPoolerExec.Encoding);
+   JSONParam.ParamName                   := 'Method_Prefix';
+   JSONParam.ObjectDirection             := odIn;
+   JSONParam.AsString                    := Method_Prefix;
+   DWParams.Add(JSONParam);
+   JSONParam                             := TJSONParam.Create(RESTClientPoolerExec.Encoding);
+   JSONParam.ParamName                   := 'Error';
+   JSONParam.ObjectDirection             := odInOut;
+   JSONParam.AsBoolean                   := False;
+   DWParams.Add(JSONParam);
+   JSONParam                             := TJSONParam.Create(RESTClientPoolerExec.Encoding);
+   JSONParam.ParamName                   := 'MessageError';
+   JSONParam.ObjectDirection             := odInOut;
+   JSONParam.AsString                    := MessageError;
+   DWParams.Add(JSONParam);
+   JSONParam                             := TJSONParam.Create(RESTClientPoolerExec.Encoding);
+   JSONParam.ParamName                   := 'BinaryRequest';
+   JSONParam.ObjectDirection             := odIn;
+   JSONParam.AsBoolean                   := BinaryRequest;
+   DWParams.Add(JSONParam);
+   JSONParam                             := TJSONParam.Create(RESTClientPoolerExec.Encoding);
+   JSONParam.ParamName                   := 'BinaryCompatibleMode';
+   JSONParam.ObjectDirection             := odIn;
+   JSONParam.AsBoolean                   := BinaryCompatibleMode;
+   DWParams.Add(JSONParam);
+   JSONParam                             := TJSONParam.Create(RESTClientPoolerExec.Encoding);
+   JSONParam.ParamName                   := 'MetadataRequest';
+   JSONParam.ObjectDirection             := odIn;
+   JSONParam.AsBoolean                   := True;
+   DWParams.Add(JSONParam);
+   JSONParam                             := TJSONParam.Create(RESTClientPoolerExec.Encoding);
+   JSONParam.ParamName                   := 'Result';
+   JSONParam.ObjectDirection             := odOUT;
+   If Not vBinaryRequest Then
+    Begin
+     JSONParam.ObjectValue         := ovString;
+     JSONParam.AsString            := '';
+    End
+   Else
+    JSONParam.ObjectValue          := ovBlob;
+   DWParams.Add(JSONParam);
+   If Assigned(ConnectionDefs) Then
+    Begin
+     JSONParam                           := TJSONParam.Create(RESTClientPoolerExec.Encoding);
+     JSONParam.ParamName                 := 'dwConnectionDefs';
+     JSONParam.ObjectDirection           := odIn;
+     JSONParam.AsString                  := TConnectionDefs(ConnectionDefs).ToJSON;
+     DWParams.Add(JSONParam);
+    End;
+   Try
+    Try
+     RESTClientPoolerExec.BinaryRequest := vBinaryRequest;
+     vResult := RESTClientPoolerExec.SendEvent('OpenDatasets', DWParams);
+     If (vResult <> '') And
+        (Uppercase(vResult) <> Uppercase(cInvalidAuth)) Then
+      Begin
+       If DWParams.ItemsString['MessageError'] <> Nil Then
+        MessageError  := DecodeStrings(DWParams.ItemsString['MessageError'].Value{$IFDEF FPC}, csUndefined{$ENDIF});
+       If DWParams.ItemsString['Error'] <> Nil Then
+        Error         := StringToBoolean(DWParams.ItemsString['Error'].Value);
+       If DWParams.ItemsString['Result'] <> Nil Then
+        Begin
+         If Not DWParams.ItemsString['Result'].IsNull Then
+          DWParams.ItemsString['Result'].SaveToStream(Result);
+        End;
+      End
+     Else
+      Begin
+       Error         := True;
+       If (vResult = '') Then
+        MessageError  := Format('Unresolved Host : ''%s''', [Host])
+       Else If (Uppercase(vResult) <> Uppercase(cInvalidAuth)) Then
+        MessageError  := 'Unauthorized...';
+       Raise Exception.Create(MessageError);
+      End;
+    Except
+     On E : Exception Do
+      Begin
+       Error         := True;
+       MessageError  := E.Message;
+      End;
+    End;
+   Finally
+    If Not Assigned(RESTClientPooler) Then
+     FreeAndNil(RESTClientPoolerExec);
+    FreeAndNil(DWParams);
+   End;
+  End;
+End;
+
 Function TRESTDWPoolerMethodClient.OpenDatasets(LinesDataset,
-                                            Pooler,
-                                            Method_Prefix           : String;
-                                            Var Error               : Boolean;
-                                            Var MessageError        : String;
-                                            Var SocketError         : Boolean;
-                                            TimeOut                 : Integer = 3000;
-                                            ConnectTimeOut          : Integer = 3000;
-                                            ConnectionDefs          : TObject           = Nil;
-                                            RESTClientPooler        : TRESTClientPoolerBase = Nil) : String;
+                                                Pooler,
+                                                Method_Prefix           : String;
+                                                Var Error               : Boolean;
+                                                Var MessageError        : String;
+                                                Var SocketError         : Boolean;
+                                                TimeOut                 : Integer = 3000;
+                                                ConnectTimeOut          : Integer = 3000;
+                                                ConnectionDefs          : TObject           = Nil;
+                                                RESTClientPooler        : TRESTClientPoolerBase = Nil) : String;
 Var
  RESTClientPoolerExec : TRESTClientPoolerBase;
  JSONParam            : TJSONParam;
@@ -3785,7 +3972,7 @@ Begin
    RESTClientPoolerExec.WelcomeMessage   := vWelcomeMessage;
    RESTClientPoolerExec.Host             := Host;
    RESTClientPoolerExec.Port             := Port;
-//   RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
+   RESTClientPoolerExec.HandleRedirects  := vHandleRedirects;
    RESTClientPoolerExec.RedirectMaximum  := vRedirectMaximum;
    RESTClientPoolerExec.RequestTimeOut   := TimeOut;
    RESTClientPoolerExec.ConnectTimeOut   := ConnectTimeOut;
