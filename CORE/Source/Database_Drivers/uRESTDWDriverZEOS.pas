@@ -291,7 +291,9 @@ Var
                                     vTempQuery.Params[A].Clear;
                                   End  //Tratar Blobs de Parametros...
                                  Else If vTempQuery.Params[A].DataType in [ftBytes, ftVarBytes, ftBlob,
-                                                                           ftGraphic, ftOraBlob, ftOraClob] Then
+                                                        ftGraphic, ftOraBlob, ftOraClob] Then
+                                 Begin
+                                  If (Not (vDWParams[I].IsNull)) Then
                                   Begin
                                    If Not Assigned(vStringStream) Then
                                     vStringStream  := TMemoryStream.Create;
@@ -305,6 +307,9 @@ Var
                                      FreeAndNil(vStringStream);
                                    End;
                                   End
+                                  Else
+                                   vTempQuery.Params[A].Clear;
+                                 End
                                  Else If vTempQuery.Params[A].DataType in [{$IFNDEF FPC}{$if CompilerVersion > 22} // Delphi 2010 pra baixo
                                                                            ftFixedChar, ftFixedWideChar,{$IFEND}{$ENDIF}
                                                                            ftString,    ftWideString,
