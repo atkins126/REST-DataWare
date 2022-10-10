@@ -200,6 +200,13 @@ Type
                         Const AResponse   : TStream        = Nil;
                         IgnoreEvents      : Boolean        = False;
                         RawHeaders        : Boolean        = False):Integer;Overload;
+  Function   Post      (AUrl            : String         = '';
+                        CustomHeaders   : TStringList    = Nil;
+                        CustomBody      : TStringList    = Nil;
+                        Const AResponse : TStringStream  = Nil;
+                        IgnoreEvents    : Boolean        = False;
+                        RawHeaders      : Boolean        = False):Integer;Overload;
+
   Function   Post      (AUrl              : String         = '';
                         CustomHeaders     : TStringList    = Nil;
                         FileName          : String         = '';
@@ -333,8 +340,7 @@ Type
  Public
   Constructor Create               (AOwner                 : TComponent);Override;
   Destructor  Destroy;Override;
-  Procedure   ReconfigureConnection(Var Connection         : TRESTClientPoolerBase;
-                                    aTypeRequest           : Ttyperequest;
+  Procedure   ReconfigureConnection(aTypeRequest           : Ttyperequest;
                                     aWelcomeMessage,
                                     aHost                  : String;
                                     aPort                  : Integer;
@@ -430,6 +436,7 @@ begin
  HttpRequest.ProxyParams.ProxyPassword         := ProxyOptions.ProxyPassword;
  HttpRequest.ProxyParams.ProxyPort             := ProxyOptions.ProxyPort;
  HttpRequest.ReadTimeout                       := RequestTimeout;
+ HttpRequest.ConnectTimeout                    := ConnectTimeOut;
  HttpRequest.AllowCookies                      := AllowCookies;
  HttpRequest.HandleRedirects                   := HandleRedirects;
  HttpRequest.RedirectMaximum                   := RedirectMaximum;
@@ -857,6 +864,144 @@ Begin
      FreeAndNil(temp);
     HttpRequest.Disconnect(false);
     DestroyClient;
+    Raise;
+   End;
+ End;
+End;
+
+Function   TRESTDWIdClientREST.Post(AUrl            : String         = '';
+                                    CustomHeaders   : TStringList    = Nil;
+                                    CustomBody      : TStringList    = Nil;
+                                    Const AResponse : TStringStream  = Nil;
+                                    IgnoreEvents    : Boolean        = False;
+                                    RawHeaders      : Boolean        = False):Integer;
+Var
+ temp         : TStringStream;
+ vTempHeaders : TStringList;
+ atempResponse,
+ tempResponse : TStringStream;
+ SendParams   : TIdMultipartFormDataStream;
+Begin
+ Result:= 200;
+ SendParams   := TIdMultipartFormDataStream.Create;
+ Try
+  tempResponse := Nil;
+  SetParams;
+  SetUseSSL(UseSSL);
+  vTempHeaders := TStringList.Create;
+  {$IFDEF FPC}
+   atempResponse  := TStringStream.Create('');
+  {$ELSE}
+   {$IF CompilerVersion < 21}
+    atempResponse := TStringStream.Create('');
+   {$ELSE}
+    atempResponse := TStringStream.Create;
+   {$IFEND}
+  {$ENDIF}
+  If Not Assigned(AResponse) Then
+   Begin
+    {$IFDEF FPC}
+     tempResponse  := TStringStream.Create('');
+    {$ELSE}
+     {$IF CompilerVersion < 21}
+      tempResponse := TStringStream.Create('');
+     {$ELSE}
+      tempResponse := TStringStream.Create;
+     {$IFEND}
+    {$ENDIF}
+   End;
+  vAUrl := AUrl;
+  Try
+   //Copy Custom Headers
+//   If Assigned(CustomHeaders) Then
+   SetHeaders(CustomHeaders);
+   If Not IgnoreEvents Then
+   If Assigned(OnBeforePost) then
+    If Not Assigned(CustomHeaders) Then
+     OnBeforePost(AUrl, vTempHeaders)
+    Else
+     OnBeforePost(AUrl, CustomHeaders);
+   If Not Assigned(AResponse) Then
+    Begin
+     HttpRequest.Post(AUrl, CustomBody, atempResponse);
+     Result:= HttpRequest.ResponseCode;
+     if Assigned(OnHeadersAvailable) then
+      OnHeadersAvailable(HttpRequest.Response.RawHeaders, True);
+     atempResponse.Position := 0;
+     If atempResponse.Size = 0 Then
+      Begin
+       If RequestCharset = esUtf8 Then
+        tempResponse.WriteString(utf8Decode(HttpRequest.Response.RawHeaders.Text))
+       Else
+        tempResponse.WriteString(HttpRequest.Response.RawHeaders.Text);
+      End
+     Else
+      Begin
+       If RequestCharset = esUtf8 Then
+        tempResponse.WriteString(utf8Decode(atempResponse.DataString))
+       Else
+        tempResponse.WriteString(atempResponse.DataString);
+      End;
+     FreeAndNil(atempResponse);
+     tempResponse.Position := 0;
+     If Not IgnoreEvents Then
+     If Assigned(OnAfterRequest) then
+      OnAfterRequest(AUrl, rtPost, tempResponse);
+    End
+   Else
+    Begin
+     temp := Nil;
+     If Assigned(CustomBody) Then
+      temp         := TStringStream.Create(CustomBody.Text);
+     HttpRequest.Post(AUrl, temp, atempResponse);
+     Result:= HttpRequest.ResponseCode;
+     if Assigned(OnHeadersAvailable) then
+      OnHeadersAvailable(HttpRequest.Response.RawHeaders, True);
+     atempResponse.Position := 0;
+     If atempResponse.Size = 0 Then
+      Begin
+       If RequestCharset = esUtf8 Then
+        AResponse.WriteString(utf8Decode(HttpRequest.Response.RawHeaders.Text))
+       Else
+        AResponse.WriteString(HttpRequest.Response.RawHeaders.Text);
+      End
+     Else
+      Begin
+       If RequestCharset = esUtf8 Then
+        AResponse.WriteString(utf8Decode(atempResponse.DataString))
+       Else
+        AResponse.WriteString(atempResponse.DataString);
+      End;
+     FreeAndNil(atempResponse);
+     AResponse.Position := 0;
+     If Not IgnoreEvents Then
+     If Assigned(OnAfterRequest) then
+      OnAfterRequest(AUrl, rtPost, AResponse);
+    End;
+  Finally
+   vTempHeaders.Free;
+   If Assigned(tempResponse) Then
+    tempResponse.Free;
+   If Assigned(atempResponse) Then
+    atempResponse.Free;
+   SendParams.Free;
+   If Assigned(temp) Then
+    temp.Free;
+  End;
+ Except
+  On E: EIdHTTPProtocolException do
+   Begin
+    If (Length(E.ErrorMessage) > 0) Or (E.ErrorCode > 0) then
+     Begin
+      Result:= E.ErrorCode;
+      temp := TStringStream.Create(E.ErrorMessage{$IFNDEF FPC}{$IF CompilerVersion > 21}, TEncoding.UTF8{$IFEND}{$ENDIF});
+      AResponse.CopyFrom(temp, temp.Size);
+      temp.Free;
+     End;
+   End;
+  On E: EIdSocketError do
+   Begin
+    HttpRequest.Disconnect(false);
     Raise;
    End;
  End;
@@ -3045,7 +3190,7 @@ Var
    AResponseInfo.ContentLength          := mb.Size;
    AResponseInfo.WriteContent;
   {$ELSE}
-   mb                                  := TStringStream.Create(ErrorMessage);
+   mb                                   := TStringStream.Create(ErrorMessage);
    mb.Position                          := 0;
    AResponseInfo.FreeContentStream      := True;
    AResponseInfo.ContentStream          := mb;
@@ -3417,6 +3562,9 @@ Begin
  If (Value)                   And
     (Not (HTTPServer.Active)) Then
   Begin
+   if not Assigned(ServerMethodClass) then
+     raise Exception.Create(cServerMethodClassNotAssigned);
+
    Try
     If (ASSLPrivateKeyFile <> '')     And
        (ASSLPrivateKeyPassword <> '') And
@@ -3527,13 +3675,12 @@ Begin
  Inherited;
 End;
 
-Procedure TRESTDWIdClientPooler.ReconfigureConnection(Var Connection        : TRESTClientPoolerBase;
-                                                      aTypeRequest           : Ttyperequest;
+Procedure TRESTDWIdClientPooler.ReconfigureConnection(aTypeRequest           : Ttyperequest;
                                                       aWelcomeMessage,
                                                       aHost                  : String;
                                                       aPort                  : Integer;
                                                       Compression,
-                                                      EncodeStrings         : Boolean;
+                                                      EncodeStrings          : Boolean;
                                                       aEncoding              : TEncodeSelect;
                                                       aAccessTag             : String;
                                                       aAuthenticationOptions : TRESTDWClientAuthOptionParams);
@@ -3570,8 +3717,8 @@ Var
  vErrorCode,
  I                : Integer;
  vDWParam         : TJSONParam;
- MemoryStream,
  vResultParams    : TStringStream;
+ MemoryStream,
  aStringStream,
  bStringStream,
  StringStream     : TStream;
@@ -3838,8 +3985,8 @@ Var
  End;
  Procedure SetParamsValues(DWParams : TRESTDWParams; SendParamsData : TIdMultipartFormDataStream);
  Var
-  I         : Integer;
-  vCharsset : String;
+  I            : Integer;
+  vCharsset    : String;
  Begin
   MemoryStream  := Nil;
   If DWParams   <> Nil Then
@@ -3848,11 +3995,6 @@ Var
      StringStreamList := TStringStreamList.Create;
     If BinaryRequest Then
      Begin
-      {$IFDEF FPC}
-       MemoryStream := TStringStream.Create('');
-      {$ELSE}
-       MemoryStream := TStringStream.Create(''{$if CompilerVersion > 21}, TEncoding.UTF8{$IFEND});
-      {$ENDIF}
       DWParams.SaveToStream(MemoryStream);
       Try
        If Assigned(MemoryStream) Then

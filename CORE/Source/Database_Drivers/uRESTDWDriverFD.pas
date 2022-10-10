@@ -1,5 +1,27 @@
 unit uRestDWDriverFD;
 
+{
+  REST Dataware .
+  Criado por XyberX (Gilbero Rocha da Silva), o REST Dataware tem como objetivo o uso de REST/JSON
+  de maneira simples, em qualquer Compilador Pascal (Delphi, Lazarus e outros...).
+  O REST Dataware também tem por objetivo levar componentes compatíveis entre o Delphi e outros Compiladores
+  Pascal e com compatibilidade entre sistemas operacionais.
+  Desenvolvido para ser usado de Maneira RAD, o REST Dataware tem como objetivo principal você usuário que precisa
+  de produtividade e flexibilidade para produção de Serviços REST/JSON, simplificando o processo para você programador.
+
+  Membros do Grupo :
+
+  XyberX (Gilberto Rocha)    - Admin - Criador e Administrador  do pacote.
+  A. Brito                   - Admin - Administrador do desenvolvimento.
+  Alexandre Abbade           - Admin - Administrador do desenvolvimento de DEMOS, coordenador do Grupo.
+  Anderson Fiori             - Admin - Gerencia de Organização dos Projetos
+  Flávio Motta               - Member Tester and DEMO Developer.
+  Mobius One                 - Devel, Tester and Admin.
+  Gustavo                    - Criptografia and Devel.
+  Eloy                       - Devel.
+  Roniery                    - Devel.
+}
+
 interface
 
 uses System.SysUtils,          System.Classes,
@@ -15,7 +37,8 @@ uses System.SysUtils,          System.Classes,
      uRESTDWBasicDB,          uRESTDWBasic,            uRESTDWJSONInterface,
      uRESTDWMassiveBuffer,    Variants,                uRESTDWDatamodule,
      uRESTDWDataset,          uRESTDWJSONObject,       uRESTDWParams,
-     uRESTDWBasicTypes,       uRESTDWDataJSON,         uRESTDWTools;
+     uRESTDWBasicTypes,       uRESTDWDataJSON,         uRESTDWTools,
+     uRESTDWBufferBase;
 
 Type
  TFDCustomTableRDW = class(TFDTable)
@@ -108,7 +131,13 @@ Type
   Function  OpenDatasets             (DatasetsLine         : String;
                                       Var Error            : Boolean;
                                       Var MessageError     : String;
-                                      Var BinaryBlob       : TMemoryStream)          : TJSONValue;Override;
+                                      Var BinaryBlob       : TMemoryStream)   : TJSONValue;Overload;Override;
+  Function  OpenDatasets             (DatapackStream        : TStream;
+                                      Var Error             : Boolean;
+                                      Var MessageError      : String;
+                                      Var BinaryBlob        : TMemoryStream;
+                                      aBinaryEvent          : Boolean = False;
+                                      aBinaryCompatibleMode : Boolean = False)   : TStream;Overload;Override;
   Procedure GetTableNames            (Var TableNames       : TStringList;
                                       Var Error            : Boolean;
                                       Var MessageError     : String);Override;
@@ -3627,6 +3656,127 @@ Begin
     MessageError   := E.Message;
    End;
  End;
+End;
+
+Function TRESTDWDriverFD.OpenDatasets(DatapackStream        : TStream;
+                                      Var Error             : Boolean;
+                                      Var MessageError      : String;
+                                      Var BinaryBlob        : TMemoryStream;
+                                      aBinaryEvent          : Boolean = False;
+                                      aBinaryCompatibleMode : Boolean = False) : TStream;
+Var
+ X               : Integer;
+ vTempQuery      : TFDQuery;
+ vStateResource  : Boolean;
+ DWParams        : TRESTDWParams;
+ BufferOutStream,
+ BufferStream,
+ BufferInStream  : TRESTDWBufferBase;
+ vStream         : TMemoryStream;
+ vSqlStream      : TRESTDWBytes;
+ vBufferStream,
+ vParamsStream   : TStream;
+Begin
+ Inherited;
+ Result          := Nil;
+ Error           := False;
+ BufferInStream  := TRESTDWBufferBase.Create;
+ BufferOutStream := TRESTDWBufferBase.Create;
+ vTempQuery      := TFDQuery.Create(Nil);
+ Try
+  BufferInStream.LoadToStream(DatapackStream);
+  vStateResource := vFDConnection.Connected;
+  If Not vFDConnection.Connected Then
+   vFDConnection.Connected := True;
+  If Not vFDConnection.InTransaction Then
+   Begin
+    {$IF CompilerVersion >= 30}
+     If Not vFDConnection.UpdateOptions.AutoCommitUpdates Then
+    {$IFEND}
+    vFDConnection.StartTransaction;
+   End;
+  vTempQuery.Connection                   := vFDConnection;
+  vTempQuery.FormatOptions.StrsTrim       := StrsTrim;
+  vTempQuery.FormatOptions.StrsEmpty2Null := StrsEmpty2Null;
+  vTempQuery.FormatOptions.StrsTrim2Len   := StrsTrim2Len;
+  While Not BufferInStream.Eof Do
+   Begin
+    vBufferStream := BufferInStream.ReadStream;
+    If Not Assigned(vBufferStream) Then
+     Continue;
+    BufferStream := TRESTDWBufferBase.Create;
+    BufferStream.LoadToStream(vBufferStream);
+    Try
+     vSqlStream    := BufferStream.ReadBytes;
+     vParamsStream := TMemoryStream(BufferStream.ReadStream);
+    Finally
+     FreeAndNil(BufferStream);
+    End;
+    vTempQuery.Close;
+    vTempQuery.SQL.Clear;
+    vTempQuery.SQL.Add(BytesToString(vSqlStream));
+    SetLength(vSqlStream, 0);
+    vTempQuery.ResourceOptions.StoreItems   := [siMeta,siData,siDelta];
+    vTempQuery.FetchOptions.Mode            := fmAll;
+    DWParams := TRESTDWParams.Create;
+    Try
+     DWParams.LoadFromStream(vParamsStream);
+     For X := 0 To DWParams.Count - 1 Do
+      Begin
+       If vTempQuery.ParamByName(DWParams[X].ParamName) <> Nil Then
+        Begin
+         vTempQuery.ParamByName(DWParams[X].ParamName).DataType := ObjectValueToFieldType(DWParams[X].ObjectValue);
+         vTempQuery.ParamByName(DWParams[X].ParamName).Value    := DWParams[X].Value;
+        End;
+      End;
+    Finally
+     DWParams.Free;
+     If Assigned(vParamsStream) Then
+      FreeAndNil(vParamsStream);
+    End;
+    vTempQuery.Open;
+    vStream := Nil;
+    If aBinaryCompatibleMode Then
+     TRESTDWClientSQLBase.SaveToStream(vTempQuery, vStream)
+    Else
+     Begin
+      vStream := TMemoryStream.Create;
+      Try
+       vTempQuery.SaveToStream(vStream, sfBinary);
+       vStream.Position := 0;
+      Finally
+      End;
+     End;
+    //Gera o Binario
+    Try
+     BufferOutStream.InputStream(vStream);
+    Finally
+    If Assigned(vStream) Then
+     FreeAndNil(vStream);
+    End;
+   End;
+  {$IF CompilerVersion >= 30}
+   If Not vFDConnection.UpdateOptions.AutoCommitUpdates Then
+  {$IFEND}
+   If vFDConnection.InTransaction Then
+    vFDConnection.Commit;
+  vFDConnection.Connected := vStateResource;
+ Except
+  On E : Exception do
+   Begin
+    vFDConnection.Connected := False;
+    Try
+     Error          := True;
+     MessageError   := E.Message;
+    Except
+    End;
+   End;
+ End;
+ FreeAndNil(BufferInStream);
+ BufferOutStream.SaveToStream(Result);
+ FreeAndNil(BufferOutStream);
+ vTempQuery.Close;
+ vTempQuery.Free;
 End;
 
 Function TRESTDWDriverFD.OpenDatasets       (DatasetsLine     : String;

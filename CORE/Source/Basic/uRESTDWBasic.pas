@@ -349,8 +349,7 @@ Type
   Procedure   SetDataRoute(Value : String);
  Public
   //Métodos, Propriedades, Variáveis, Procedures e Funções Publicas
-  Procedure   ReconfigureConnection(Var Connection        : TRESTClientPoolerBase;
-                                    TypeRequest           : Ttyperequest;
+  Procedure   ReconfigureConnection(TypeRequest           : Ttyperequest;
                                     WelcomeMessage,
                                     Host                  : String;
                                     Port                  : Integer;
@@ -800,18 +799,30 @@ Implementation
 
 Uses uRESTDWDatamodule,   uRESTDWPoolermethod,  uRESTDWTools,
      uRESTDWServerEvents, uRESTDWServerContext, uRESTDWMessageCoder,
-     uRESTDWBasicDB,      ZLib;
+     uRESTDWBasicDB,      uRESTDWBufferBase,    ZLib;
 
 Procedure SaveLogData(Filename, Content : String);
+{$IF not(Defined(FPC)) AND (CompilerVersion < 21)}
+Var
+  vFileData: TFileStream;
+Begin
+  vFileData := TFileStream.Create(Filename, fmCreate);
+  try
+    vFileData.WriteBuffer(Pointer(Content)^, Length(Content));
+  finally
+    FreeAndNil(vFileData);
+  end;
+{$ELSE}
 Var
  vFileData : TStringStream;
 Begin
  vFileData := TStringStream.Create(Content);
  Try
-  vFileData.SaveToFile(Filename);
+   vFileData.SaveToFile(Filename);
  Finally
   FreeAndNil(vFileData);
  End;
+{$IFEND}
 End;
 
 Function GetParamsReturn(Params : TRESTDWParams) : String;
@@ -1280,8 +1291,7 @@ Begin
               End;
              If Assigned(vOnFailOverExecute) Then
               vOnFailOverExecute(vFailOverConnections[I]);
-             ReconfigureConnection(Self,
-                                   vFailOverConnections[I].vTypeRequest,
+             ReconfigureConnection(vFailOverConnections[I].vTypeRequest,
                                    vFailOverConnections[I].vWelcomeMessage,
                                    vFailOverConnections[I].vRestWebService,
                                    vFailOverConnections[I].vPoolerPort,
@@ -1373,8 +1383,7 @@ Begin
               End;
              If Assigned(vOnFailOverExecute) Then
               vOnFailOverExecute(vFailOverConnections[I]);
-             ReconfigureConnection(Self,
-                                   vFailOverConnections[I].vTypeRequest,
+             ReconfigureConnection(vFailOverConnections[I].vTypeRequest,
                                    vFailOverConnections[I].vWelcomeMessage,
                                    vFailOverConnections[I].vRestWebService,
                                    vFailOverConnections[I].vPoolerPort,
@@ -2252,28 +2261,31 @@ Begin
        End;
       If Assigned(ContentStringStream) Then
        Begin
-        ContentStringStream.Position := 0;
-        Try
-         mb := TStringStream.Create(''); //{$IFNDEF FPC}{$if CompilerVersion > 21}, TEncoding.UTF8{$IFEND}{$ENDIF});
-         Try
-          mb.CopyFrom(ContentStringStream, ContentStringStream.Size);
-                      ContentStringStream.Position := 0;
-          mb.Position := 0;
-          If (pos('--', TStringStream(mb).DataString) > 0) and (pos('boundary', ContentType) > 0) Then
-           Begin
-            msgEnd   := False;
-            boundary := ExtractHeaderSubItem(ContentType, 'boundary', QuoteHTTP);
-            startboundary := '--' + boundary;
-            Repeat
-             tmp := ReadLnFromStream(ContentStringStream, -1, True);
-            Until tmp = startboundary;
+         ContentStringStream.Position := 0;
+         If Not vBinaryEvent Then
+          Begin
+           Try
+            mb := TStringStream.Create(''); //{$IFNDEF FPC}{$if CompilerVersion > 21}, TEncoding.UTF8{$IFEND}{$ENDIF});
+            try
+             mb.CopyFrom(ContentStringStream, ContentStringStream.Size);
+                         ContentStringStream.Position := 0;
+             mb.Position := 0;
+             If (pos('--', TStringStream(mb).DataString) > 0) and (pos('boundary', ContentType) > 0) Then
+              Begin
+               msgEnd   := False;
+               boundary := ExtractHeaderSubItem(ContentType, 'boundary', QuoteHTTP);
+               startboundary := '--' + boundary;
+               Repeat
+                tmp := ReadLnFromStream(ContentStringStream, -1, True);
+               Until tmp = startboundary;
+              End;
+            finally
+             if Assigned(mb) then
+              FreeAndNil(mb);
+            end;
+           Except
            End;
-         Finally
-          if Assigned(mb) then
-           FreeAndNil(mb);
-         End;
-        Except
-        End;
+          End;
         If (ContentStringStream.Size > 0) And (boundary <> '') Then
          Begin
           Try
@@ -2541,7 +2553,7 @@ Begin
               TRESTDWDataUtils.ParseBodyBinToDWParam(TStringStream(mb).DataString, vEncoding, DWParams{$IFDEF FPC}, vDatabaseCharSet{$ENDIF})
              Else If (vBinaryEvent) Then
               Begin
-               If (pos('--', TStringStream(ms).DataString) > 0) and (pos('boundary', ContentType) > 0) Then
+               If (pos('--', TStringStream(mb).DataString) > 0) and (pos('boundary', ContentType) > 0) Then
                 Begin
                  msgEnd   := False;
                  {$IFNDEF FPC}
@@ -3005,8 +3017,8 @@ Begin
         vAccessTag := DecodeStrings(DWParams.ItemsString['dwaccesstag'].AsString{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
        Try
         vTempServerMethods  := vServerMethod.Create(Nil);
-        TServerMethodDataModule(vTempServerMethods).GetAction(vOldRequest, DWParams);
-        vUrlToExec := vOldRequest;
+        TServerMethodDataModule(vTempServerMethods).GetAction(Cmd, DWParams);
+        vUrlToExec := Cmd;
        Finally
        End;
        If (vTempServerMethods.ClassType = TServerMethodDatamodule)             Or
@@ -4656,6 +4668,8 @@ Var
  vError,
  vInvalidTag     : Boolean;
  JSONParam       : TJSONParam;
+ vByteStream     : TRESTDWBytes;
+ aBinaryBlob     : TStream;
  Procedure ParseURL;
  Var
   I           : Integer;
@@ -4733,9 +4747,28 @@ Begin
        vResult    := '';
        vResult    := DWParams.ItemsString['Pooler'].Value;
        EchoPooler(BaseObject, AContext, vResult, vResultIP, AccessTag, vInvalidTag);
-       If DWParams.ItemsString['Result'] <> Nil Then
-        DWParams.ItemsString['Result'].SetValue(vResultIP,
-                                                DWParams.ItemsString['Result'].Encoded);
+       If BinaryEvent Then
+        Begin
+         vByteStream := StringToBytes(vResultIP);
+         BufferBase  := TRESTDWBufferBase.Create; //Cria Pacote Base
+         aBinaryBlob := TMemoryStream.Create;
+         Try
+          BufferBase.InputBytes(vByteStream);
+          SetLength(vByteStream, 0);
+          BufferBase.SaveToStream(aBinaryBlob);
+         Finally
+          FreeAndNil(BufferBase);
+          If DWParams.ItemsString['Result'] <> Nil Then
+           DWParams.ItemsString['Result'].LoadFromStream(aBinaryBlob);
+          FreeAndNil(aBinaryBlob);
+         End;
+        End
+       Else
+        Begin
+         If DWParams.ItemsString['Result'] <> Nil Then
+          DWParams.ItemsString['Result'].SetValue(vResultIP,
+                                                  DWParams.ItemsString['Result'].Encoded);
+        End;
       End
      Else
       Begin
@@ -5806,6 +5839,7 @@ Var
 Begin
  BinaryBlob    := Nil;
  vTempJSON     := Nil;
+ aDataPack     := Nil;
  Try
   If ServerMethodsClass <> Nil Then
    Begin
@@ -5844,6 +5878,7 @@ Begin
                DWParams.ItemsString['DatasetStream'].SaveToStream(aDataPack);
                BinaryBlob := TMemoryStream(TRESTDWPoolerDB(ServerMethodsClass.Components[i]).RESTDriver.OpenDatasets(aDataPack,  vError,        vMessageError,
                                                                                                                      BinaryBlob, BinaryRequest, BinaryCompatible));
+               FreeAndNil(aDataPack);
                If Assigned(BinaryBlob) Then
                 DWParams.ItemsString['Result'].LoadFromStream(BinaryBlob)
                Else
