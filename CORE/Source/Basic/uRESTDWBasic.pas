@@ -81,23 +81,35 @@ Type
   Function  GetGenID                  (Query                 : TComponent;
                                        GenName               : String): Integer;          Virtual;Abstract;
   Constructor Create                  (AOwner                : TComponent);               Override; //Cria o Componente
+  Function ApplyUpdates               (MassiveStream         : TStream;
+                                       SQL                   : String;
+                                       Params                : TRESTDWParams;
+                                       Var Error             : Boolean;
+                                       Var MessageError      : String;
+                                       Var RowsAffected      : Integer) : TJSONValue;     Overload;Virtual;Abstract;
   Function ApplyUpdates               (Massive,
                                        SQL                   : String;
                                        Params                : TRESTDWParams;
                                        Var Error             : Boolean;
                                        Var MessageError      : String;
-                                       Var RowsAffected      : Integer) : TJSONValue;     Virtual;Abstract;
+                                       Var RowsAffected      : Integer) : TJSONValue;     Overload;Virtual;Abstract;
   Function ApplyUpdates_MassiveCache  (MassiveCache          : String;
                                        Var Error             : Boolean;
                                        Var MessageError      : String) : TJSONValue;      Virtual;Abstract;
   Function ProcessMassiveSQLCache     (MassiveSQLCache       : String;
                                        Var Error             : Boolean;
                                        Var MessageError      : String) : TJSONValue;      Virtual;Abstract;
+  Function ApplyUpdatesTB             (MassiveStream         : TStream;
+                                       SQL                   : String;
+                                       Params                : TRESTDWParams;
+                                       Var Error             : Boolean;
+                                       Var MessageError      : String;
+                                       Var RowsAffected      : Integer) : TJSONValue;     Overload;Virtual;Abstract;
   Function ApplyUpdatesTB             (Massive               : String;
                                        Params                : TRESTDWParams;
                                        Var Error             : Boolean;
                                        Var MessageError      : String;
-                                       Var RowsAffected      : Integer) : TJSONValue;     Virtual;Abstract;
+                                       Var RowsAffected      : Integer) : TJSONValue;     Overload;Virtual;Abstract;
   Function ApplyUpdates_MassiveCacheTB(MassiveCache          : String;
                                        Var Error             : Boolean;
                                        Var MessageError      : String) : TJSONValue;      Virtual;Abstract;
@@ -635,13 +647,15 @@ Type
                                       Var Pooler              : String;
                                       Var DWParams            : TRESTDWParams;
                                       ConnectionDefs          : TConnectionDefs;
-                                      hEncodeStrings          : Boolean;
+                                      hEncodeStrings,
+                                      BinaryEvent             : Boolean;
                                       AccessTag               : String);
   Procedure ApplyUpdatesJSONTB       (ServerMethodsClass      : TComponent;
                                       Var Pooler              : String;
                                       Var DWParams            : TRESTDWParams;
                                       ConnectionDefs          : TConnectionDefs;
-                                      hEncodeStrings          : Boolean;
+                                      hEncodeStrings,
+                                      BinaryEvent             : Boolean;
                                       AccessTag               : String);
   Procedure OpenDatasets             (ServerMethodsClass      : TComponent;
                                       Var Pooler              : String;
@@ -663,17 +677,17 @@ Type
                                         ConnectionDefs        : TConnectionDefs;
                                         hEncodeStrings        : Boolean;
                                         AccessTag             : String);
-  Procedure   ProcessMassiveSQLCache (ServerMethodsClass      : TComponent;
+  Procedure ProcessMassiveSQLCache   (ServerMethodsClass      : TComponent;
                                       Var Pooler              : String;
                                       Var DWParams            : TRESTDWParams;
                                       ConnectionDefs          : TConnectionDefs;
                                       hEncodeStrings          : Boolean;
                                       AccessTag               : String);
-  Procedure   GetEvents              (ServerMethodsClass      : TComponent;
+  Procedure GetEvents                (ServerMethodsClass      : TComponent;
                                       Pooler,
                                       urlContext              : String;
                                       Var DWParams            : TRESTDWParams);
-  Function    ReturnEvent            (ServerMethodsClass      : TComponent;
+  Function ReturnEvent               (ServerMethodsClass      : TComponent;
                                       Pooler,
                                       urlContext              : String;
                                       Var vResult             : String;
@@ -684,10 +698,10 @@ Type
                                       AccessTag               : String;
                                       Const RequestType       : TRequestType;
                                       Var   RequestHeader     : TStringList) : Boolean;
-  Procedure   GetServerEventsList    (ServerMethodsClass      : TComponent;
+  Procedure GetServerEventsList      (ServerMethodsClass      : TComponent;
                                       Var ServerEventsList    : String;
                                       AccessTag               : String);
-  Function    ReturnContext          (ServerMethodsClass      : TComponent;
+  Function ReturnContext             (ServerMethodsClass      : TComponent;
                                       Pooler,
                                       urlContext              : String;
                                       Var vResult,
@@ -699,15 +713,15 @@ Type
                                       mark                    : String;
                                       RequestHeader           : TStringList;
                                       Var ErrorCode           : Integer) : Boolean;
-  Procedure   SetServerAuthOptions   (AuthenticationOptions   : TRESTDWServerAuthOptionParams);
+  Procedure SetServerAuthOptions     (AuthenticationOptions   : TRESTDWServerAuthOptionParams);
  Public
   Procedure EchoPooler               (ServerMethodsClass      : TComponent;
                                       AContext                : TComponent;
                                       Var Pooler, MyIP        : String;
                                       AccessTag               : String;
                                       Var InvalidTag          : Boolean);Virtual;Abstract;
-  Procedure   SetActive    (Value               : Boolean);Virtual;
-  Function    CommandExec  (Const AContext : TComponent;
+  Procedure SetActive                (Value               : Boolean);Virtual;
+  Function CommandExec     (Const AContext : TComponent;
                             Url,
                             RawHTTPCommand      : String;
                             Var ContentType     : String;
@@ -732,6 +746,7 @@ Type
                             Redirect            : TRedirect) : Boolean;
   Procedure   ClearDataRoute;
   Procedure   AddDataRoute (DataRoute           : String; MethodClass : TComponentClass);
+  Function    GetDataRouteCount: integer;
   Constructor Create       (AOwner              : TComponent);Override;//Cria o Componente
   Destructor  Destroy; Override;//Destroy a Classe
  Published
@@ -1727,20 +1742,24 @@ Var
      For I := 0 To RawHeaders.Count -1 Do
       Begin
        tmp := RawHeaders.Names[I];
+       vTempText := RawHeaders.Values[tmp];
+       if (vTempText <> '') and (vTempText[InitStrPos] = ' ') then
+         Delete(vTempText,1,1);
+
        If pos('dwwelcomemessage', lowercase(tmp)) > 0 Then
-        vWelcomeMessage := DecodeStrings(RawHeaders.Values[tmp]{$IFDEF FPC}, vDatabaseCharSet{$ENDIF})
+        vWelcomeMessage := DecodeStrings(vTempText{$IFDEF FPC}, vDatabaseCharSet{$ENDIF})
        Else If pos('dwaccesstag', lowercase(tmp)) > 0 Then
-        vAccessTag := DecodeStrings(RawHeaders.Values[tmp]{$IFDEF FPC}, vDatabaseCharSet{$ENDIF})
+        vAccessTag := DecodeStrings(vTempText{$IFDEF FPC}, vDatabaseCharSet{$ENDIF})
        Else If pos('datacompression', lowercase(tmp)) > 0 Then
-        compresseddata := StringToBoolean(RawHeaders.Values[tmp])
+        compresseddata := StringToBoolean(vTempText)
        Else If pos('dwencodestrings', lowercase(tmp)) > 0 Then
-        encodestrings  := StringToBoolean(RawHeaders.Values[tmp])
+        encodestrings  := StringToBoolean(vTempText)
        Else If pos('dwusecript', lowercase(tmp)) > 0 Then
-        vdwCriptKey    := StringToBoolean(RawHeaders.Values[tmp])
+        vdwCriptKey    := StringToBoolean(vTempText)
        Else If (pos('dwassyncexec', lowercase(tmp)) > 0) And (Not (dwassyncexec)) Then
-        dwassyncexec   := StringToBoolean(RawHeaders.Values[tmp])
+        dwassyncexec   := StringToBoolean(vTempText)
        Else if pos('binaryrequest', lowercase(tmp)) > 0 Then
-        vBinaryEvent   := StringToBoolean(RawHeaders.Values[tmp])
+        vBinaryEvent   := StringToBoolean(vTempText)
        Else If pos('dwconnectiondefs', lowercase(tmp)) > 0 Then
         Begin
          vdwConnectionDefs   := TConnectionDefs.Create;
@@ -1748,7 +1767,7 @@ Var
          Try
           JSONValue.Encoding  := vEncoding;
           JSONValue.Encoded  := True;
-          JSONValue.LoadFromJSON(RawHeaders.Values[tmp]);
+          JSONValue.LoadFromJSON(vTempText);
           vdwConnectionDefs.LoadFromJSON(JSONValue.Value);
          Finally
           FreeAndNil(JSONValue);
@@ -1763,7 +1782,7 @@ Var
           {$IFDEF FPC}
           JSONValue.DatabaseCharSet := vDatabaseCharSet;
           {$ENDIF}
-          JSONValue.LoadFromJSON(RawHeaders.Values[tmp]);
+          JSONValue.LoadFromJSON(vTempText);
           vdwservereventname := JSONValue.AsString;
          Finally
           FreeAndNil(JSONValue);
@@ -1789,11 +1808,10 @@ Var
               {$IFDEF FPC}
               JSONParam.DatabaseCharSet := vDatabaseCharSet;
               {$ENDIF}
-              tmp                       := RawHeaders.Values[tmp];
-              If (Pos(LowerCase('{"ObjectType":"toParam", "Direction":"'), LowerCase(tmp)) > 0) Then
-               JSONParam.FromJSON(tmp)
+              If (Pos(LowerCase('{"ObjectType":"toParam", "Direction":"'), LowerCase(vTempText)) > 0) Then
+               JSONParam.FromJSON(vTempText)
               Else
-               JSONParam.AsString  := tmp;
+               JSONParam.AsString  := vTempText;
               DWParams.Add(JSONParam);
              End;
            End;
@@ -1912,10 +1930,9 @@ Var
      Begin
       If ServerMethodsClass.Components[i] is TRESTDWServerContext Then
        Begin
-        If ((aEventName = '')      And
-            (TRESTDWServerContext(ServerMethodsClass.Components[i]).ContextList.ContextByName[aServerEvent] <> Nil))   Then
+        If (TRESTDWServerContext(ServerMethodsClass.Components[i]).ContextList.ContextByName[aServerEvent] <> Nil)   Then
          Begin
-          vRootContext := TRESTDWServerContext(ServerMethodsClass.Components[i]).DefaultContext;
+          vRootContext := '';
           Result := TRESTDWServerContext(ServerMethodsClass.Components[i]).ContextList.ContextByName[aServerEvent];
           If Assigned(Result) Then
            Break;
@@ -2032,44 +2049,15 @@ Begin
      sContentType := 'application/pdf'
     Else If (Pos('.CSS', UpperCase(Cmd)) > 0) Then
      sContentType:='text/css';
-    {$IFNDEF FPC}
-     {$if CompilerVersion > 21}
-      If aDefaultUrl <> '' Then
-       Begin
-        sFile := Url;
-        vTempText := IncludeTrailingPathDelimiter(aDefaultUrl);
-        {$IFDEF MSWINDOWS}
-         vTempText := StringReplace(vTempText, '\', '/', [rfReplaceAll]);
-         vTempText := StringReplace(vTempText, '//', '/', [rfReplaceAll]);
-        {$ENDIF}
-        If Pos(vTempText, sFile) >= InitStrPos Then
-         Delete(sFile, Pos(vTempText, sFile) - FinalStrPos, Length(vTempText));
-        sFile := FRootPath + vTempText + sFile;
-       End
-      Else
-       sFile := FRootPath + Url;
-     {$ELSE}
-      If aDefaultUrl <> '' Then
-       Begin
-        sFile := Url;
-        vTempText := IncludeTrailingPathDelimiter(aDefaultUrl);
-        {$IFDEF MSWINDOWS}
-         vTempText := StringReplace(vTempText, '\', '/', [rfReplaceAll]);
-         vTempText := StringReplace(vTempText, '//', '/', [rfReplaceAll]);
-        {$ENDIF}
-        If Pos(vTempText, sFile) >= InitStrPos Then
-         Delete(sFile, Pos(vTempText, sFile) - FinalStrPos, Length(vTempText));
-        sFile := FRootPath + vTempText + sFile;
-       End
-      Else
-       sFile := FRootPath + Url;
-     {$IFEND}
-    {$ELSE}
-     sFile := FRootPath  + Url;
-    {$ENDIF}
+    sFile := Url;
+    If Pos(vTempText, sFile) >= InitStrPos Then
+     Delete(sFile, Pos(vTempText, sFile) - FinalStrPos, Length(vTempText));
+    sFile := IncludeTrailingPathDelimiter(FRootPath) + sFile;
     {$IFDEF MSWINDOWS}
      sFile := StringReplace(sFile, '/', '\', [rfReplaceAll]);
      sFile := StringReplace(sFile, '\\', '\', [rfReplaceAll]);
+    {$ELSE}
+     sFile := StringReplace(sFile, '//', '/', [rfReplaceAll]);
     {$ENDIF}
     If (vPathTraversalRaiseError) And
        (RESTDWFileExists(sFile, FRootPath)) And
@@ -2096,7 +2084,7 @@ Begin
       ServerContextStream.LoadFromFile(sFile);
       ServerContextStream.Position := 0;
       If Not (Assigned(ResultStream)) Then
-       ResultStream := TStringStream.Create('');
+       ResultStream := TMemoryStream.Create;
       ResultStream.CopyFrom(ServerContextStream, ServerContextStream.Size);
       FreeAndNil(ServerContextStream);
       DestroyComponents;
@@ -2154,13 +2142,18 @@ Begin
                      (Pos('=', Lowercase(Url)) > 0);
     If Not vIsQueryParam Then
      vIsQueryParam := (Pos('?', Lowercase(RawHTTPCommand)) > 0);
-    vOldRequest    := Cmd;
+    if (cmd = '') or (cmd = '/') then
+     vOldRequest   := aDefaultUrl
+    else
+     vOldRequest   := Cmd;
     If vIsQueryParam Then
      vUrlToExec    := Url
     Else
      vUrlToExec    := Cmd;
+
     If (Cmd <> '/') And (Cmd <> '') Then
      ReadRawHeaders;
+
     vCompareContext := CompareBaseURL(Cmd); // := aDefaultUrl;
     If Cmd <> '' Then
      TRESTDWDataUtils.ParseRESTURL (ClearRequestType(Cmd), vEncoding, vmark{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}, DWParams);
@@ -3017,8 +3010,8 @@ Begin
         vAccessTag := DecodeStrings(DWParams.ItemsString['dwaccesstag'].AsString{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
        Try
         vTempServerMethods  := vServerMethod.Create(Nil);
-        TServerMethodDataModule(vTempServerMethods).GetAction(Cmd, DWParams);
-        vUrlToExec := Cmd;
+        TServerMethodDataModule(vTempServerMethods).GetAction(vOldRequest, DWParams);
+        vUrlToExec := vOldRequest;
        Finally
        End;
        If (vTempServerMethods.ClassType = TServerMethodDatamodule)             Or
@@ -3758,6 +3751,17 @@ Begin
                    DWParams.CreateParam('token', vReplyString);
                   End;
                  Try
+                  If DWParams.ItemsString['MessageError'] = Nil Then
+                  Begin
+                   DWParams.CreateParam('MessageError');
+                   DWParams.ItemsString['MessageError'].ObjectDirection := odOut;
+                  End;
+
+                  if ((JSONStr <> TReplyOK) and (JSONStr <> Trim(''))) then
+                   DWParams.ItemsString['MessageError'].AsString := JSONStr
+                  else
+                   DWParams.ItemsString['MessageError'].AsString := '';
+
                   DWParams.SaveToStream(ms, tdwpxt_OUT);
                   ZCompressStreamD(ms, ResultStream);
                  Finally
@@ -4840,7 +4844,7 @@ Begin
    Else If vUrlMethod = UpperCase('ApplyUpdates') Then
     Begin
      vResult    := DWParams.ItemsString['Pooler'].Value;
-     ApplyUpdatesJSON(BaseObject, vResult, DWParams, ConnectionDefs, hEncodeStrings, AccessTag);
+     ApplyUpdatesJSON(BaseObject, vResult, DWParams, ConnectionDefs, hEncodeStrings, BinaryEvent, AccessTag);
      Result     := True;
      If Not(DWParams.ItemsString['Error'].AsBoolean) Then
       JSONStr    := TReplyOK
@@ -4850,7 +4854,7 @@ Begin
    Else If vUrlMethod = UpperCase('ApplyUpdatesTB') Then
     Begin
      vResult    := DWParams.ItemsString['Pooler'].Value;
-     ApplyUpdatesJSONTB(BaseObject, vResult, DWParams, ConnectionDefs, hEncodeStrings, AccessTag);
+     ApplyUpdatesJSONTB(BaseObject, vResult, DWParams, ConnectionDefs, hEncodeStrings, BinaryEvent, AccessTag);
      Result     := True;
      If Not(DWParams.ItemsString['Error'].AsBoolean) Then
       JSONStr    := TReplyOK
@@ -5640,12 +5644,14 @@ Procedure TRESTServiceBase.ApplyUpdatesJSON(ServerMethodsClass : TComponent;
                                               Var Pooler         : String;
                                               Var DWParams       : TRESTDWParams;
                                               ConnectionDefs     : TConnectionDefs;
-                                              hEncodeStrings     : Boolean;
+                                              hEncodeStrings,
+                                              BinaryEvent        : Boolean;
                                               AccessTag          : String);
 Var
  vRowsAffected,
  I             : Integer;
  vTempJSON     : TJSONValue;
+ vBufferStream : TStream;
  vError        : Boolean;
  vSQL,
  vMessageError : String;
@@ -5691,7 +5697,20 @@ Begin
              Raise Exception.Create(cInvalidDriverConnection);
             TRESTDWPoolerDB(ServerMethodsClass.Components[i]).RESTDriver.PrepareConnection(ConnectionDefs);
             DWParams.ItemsString['Massive'].CriptOptions.Use := False;
-            vTempJSON := TRESTDWPoolerDB(ServerMethodsClass.Components[i]).RESTDriver.ApplyUpdates(DWParams.ItemsString['Massive'].AsString,
+            If BinaryEvent Then
+             Begin
+              vBufferStream := TMemoryStream.Create;
+              Try
+               DWParams.ItemsString['Massive'].SaveToStream(vBufferStream);
+               vTempJSON := TRESTDWPoolerDB(ServerMethodsClass.Components[i]).RESTDriver.ApplyUpdates(vBufferStream,
+                                                                                                      vSQL,
+                                                                                                      DWParamsD, vError, vMessageError, vRowsAffected);
+              Finally
+               FreeAndNil(vBufferStream);
+              End;
+             End
+            Else
+             vTempJSON := TRESTDWPoolerDB(ServerMethodsClass.Components[i]).RESTDriver.ApplyUpdates(DWParams.ItemsString['Massive'].AsString,
                                                                                                     vSQL,
                                                                                                     DWParamsD, vError, vMessageError, vRowsAffected);
            Except
@@ -5733,7 +5752,8 @@ Procedure TRESTServiceBase.ApplyUpdatesJSONTB(ServerMethodsClass : TComponent;
                                                 Var Pooler         : String;
                                                 Var DWParams       : TRESTDWParams;
                                                 ConnectionDefs     : TConnectionDefs;
-                                                hEncodeStrings     : Boolean;
+                                                hEncodeStrings,
+                                                BinaryEvent        : Boolean;
                                                 AccessTag          : String);
 Var
  vRowsAffected,
@@ -6448,21 +6468,8 @@ Begin
        vTagService := False;
        For B := 0 To TRESTDWServerContext(ServerMethodsClass.Components[i]).ContextList.Count -1 Do
         Begin
-         If ((LowerCase(Pooler) = LowerCase(TRESTDWServerContext(ServerMethodsClass.Components[i]).DefaultContext))) Or
-            ((Trim(TRESTDWServerContext(ServerMethodsClass.Components[i]).DefaultContext) = '')                      And
-             ((urlContext = '') or (urlContext = '/')))                                                              Then
-          vTagService := (TRESTDWServerContext(ServerMethodsClass.Components[i]).ContextList.ContextByName[Pooler] <> Nil);
-         If vTagService Then
-          Begin
-           vRootContext := TRESTDWServerContext(ServerMethodsClass.Components[i]).DefaultContext;
-           If (((urlContext = '') or (urlContext = '/')) And (vRootContext <> '')) And (Pooler = '') Then
-            Pooler := vRootContext;
-          End
-         Else
-          Begin
-           If LowerCase(urlContext) = LowerCase(TRESTDWServerContext(ServerMethodsClass.Components[i]).ContextList[B].BaseURL) Then
-            vTagService := LowerCase(TRESTDWServerContext(ServerMethodsClass.Components[i]).ContextList[B].ContextName) = LowerCase(Pooler);
-          End;
+         If LowerCase(urlContext) = LowerCase(TRESTDWServerContext(ServerMethodsClass.Components[i]).ContextList[B].BaseURL) Then
+          vTagService := LowerCase(TRESTDWServerContext(ServerMethodsClass.Components[i]).ContextList[B].ContextName) = LowerCase(Pooler);
          If vTagService Then
           Break;
         End;
@@ -6644,6 +6651,11 @@ Begin
  vDataRoute.DataRoute         := DataRoute;
  vDataRoute.ServerMethodClass := MethodClass;
  vDataRouteList.Add(vDataRoute);
+End;
+
+Function TRESTServiceBase.GetDataRouteCount: integer;
+Begin
+  Result := vDataRouteList.Count;
 End;
 
 Constructor TRESTServiceBase.Create(AOwner: TComponent);

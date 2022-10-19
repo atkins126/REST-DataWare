@@ -8,36 +8,32 @@
       <Unit>
         <Filename Value="RESTDWInstalador.lpr"/>
         <IsPartOfProject Value="True"/>
-        <CursorPos X="43" Y="15"/>
-        <UsageCount Value="71"/>
-        <Loaded Value="True"/>
+        <EditorIndex Value="-1"/>
+        <CursorPos X="24" Y="9"/>
+        <UsageCount Value="78"/>
       </Unit>
       <Unit>
         <Filename Value="src\funcoes\udetectide.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="2"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="354"/>
         <CursorPos X="58" Y="364"/>
-        <UsageCount Value="68"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="75"/>
       </Unit>
       <Unit>
         <Filename Value="src\funcoes\uidefunctions.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="3"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="29"/>
         <CursorPos X="5" Y="11"/>
-        <UsageCount Value="68"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="75"/>
       </Unit>
       <Unit>
         <Filename Value="src\funcoes\uconsts.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="4"/>
-        <TopLine Value="30"/>
+        <EditorIndex Value="-1"/>
         <CursorPos X="38" Y="57"/>
-        <UsageCount Value="65"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="72"/>
       </Unit>
       <Unit>
         <Filename Value="src\telas\uprincipal.pas"/>
@@ -46,12 +42,14 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <IsVisibleTab Value="True"/>
-        <EditorIndex Value="1"/>
-        <TopLine Value="104"/>
-        <CursorPos X="30" Y="115"/>
-        <UsageCount Value="27"/>
-        <Loaded Value="True"/>
-        <LoadedDesigner Value="True"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="255"/>
+        <CursorPos X="25" Y="257"/>
+        <UsageCount Value="32"/>
+      </Unit>
+      <Unit>
+        <Filename Value="src\funcoes\ulazarusdetect.pas"/>
+        <UsageCount Value="22"/>
       </Unit>
       <Unit>
         <Filename Value="src\telas\uprincipalold.pas"/>
@@ -74,16 +72,6 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="67"/>
-      </Unit>
-      <Unit>
-        <Filename Value="src\telas\uprincipal.pas"/>
-        <ComponentName Value="fPrincipal"/>
-        <HasResources Value="True"/>
-        <ResourceBaseClass Value="Form"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="5"/>
-        <CursorPos X="3" Y="34"/>
-        <UsageCount Value="25"/>
       </Unit>
       <Unit>
         <Filename Value="src\frteste.pas"/>
@@ -160,6 +148,13 @@
         <TopLine Value="5724"/>
         <CursorPos Y="5734"/>
         <UsageCount Value="9"/>
+      </Unit>
+      <Unit>
+        <Filename Value="D:\IDE\lazarus\lazarus\lcl\include\control.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="4505"/>
+        <CursorPos X="5" Y="4515"/>
+        <UsageCount Value="10"/>
       </Unit>
     </Units>
     <JumpHistory HistoryIndex="-1"/>

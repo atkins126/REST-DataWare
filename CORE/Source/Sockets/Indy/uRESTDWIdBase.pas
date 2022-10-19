@@ -73,6 +73,7 @@ Type
   vSSLVerifyMode                   : TIdSSLVerifyModeSet;
   vSSLVerifyDepth                  : Integer;
   vSSLMode                         : TIdSSLMode;
+  aSSLVersions                     : TIdSSLVersions;
   Procedure aCommandGet             (AContext         : TIdContext;
                                      ARequestInfo     : TIdHTTPRequestInfo;
                                      AResponseInfo    : TIdHTTPResponseInfo);
@@ -120,6 +121,7 @@ Type
   Property SSLVerifyDepth          : Integer             Read vSSLVerifyDepth          Write vSSLVerifyDepth;
   Property SSLMode                 : TIdSSLMode          Read vSSLMode                 Write vSSLMode;
   Property SSLMethod               : TIdSSLVersion       Read aSSLMethod               Write aSSLMethod;
+  Property SSLVersions             : TIdSSLVersions      Read aSSLVersions             Write aSSLVersions;
   Property CipherList              : String              Read vCipherList              Write vCipherList;
 End;
 
@@ -365,7 +367,11 @@ Uses uRESTDWJSONInterface;
 
 Destructor TRESTDWIdClientREST.Destroy;
 Begin
- FreeAndNil(HttpRequest);
+ if Assigned(HttpRequest) then
+ begin
+  HttpRequest.Disconnect(false);
+  FreeAndNil(HttpRequest);
+ end;
  Inherited;
 End;
 
@@ -376,12 +382,8 @@ Begin
  {$ENDIF}
  If Assigned(HttpRequest) Then
   Begin
-   Try
-    If HttpRequest.Connected Then
-     HttpRequest.Disconnect(False);
-   Finally
-//    FreeAndNil(HttpRequest);
-   End;
+   HttpRequest.Disconnect(False);
+   //FreeAndNil(HttpRequest);
   End;
 End;
 
@@ -649,7 +651,6 @@ Begin
  Result:= 200;
  SendParams   := TIdMultipartFormDataStream.Create;
  Try
-  tempResponse := Nil;
   SetParams;
   SetUseSSL(UseSSL);
   vTempHeaders := TStringList.Create;
@@ -662,6 +663,7 @@ Begin
     atempResponse := TStringStream.Create;
    {$IFEND}
   {$ENDIF}
+  If Not Assigned(CustomBody) Then  
   {$IFDEF FPC}
    tempResponse  := TStringStream.Create('');
   {$ELSE}
@@ -682,21 +684,35 @@ Begin
      OnBeforePost(AUrl, CustomHeaders);
    CopyStringList(CustomHeaders, vTempHeaders);
    SetRawHeaders(vTempHeaders, SendParams);
-   HttpRequest.Post(AUrl, SendParams, atempResponse);
-   Result:= HttpRequest.ResponseCode;
-   If Assigned(OnHeadersAvailable) Then
-    OnHeadersAvailable(HttpRequest.Response.RawHeaders, True);
-   atempResponse.Position := 0;
-   If RequestCharset = esUtf8 Then
-    aString := utf8Decode(atempResponse.DataString)
+
+   If Not Assigned(CustomBody) Then
+    Begin
+     HttpRequest.Post(AUrl, SendParams, atempResponse);
+     Result:= HttpRequest.ResponseCode;
+     if Assigned(OnHeadersAvailable) then
+      OnHeadersAvailable(HttpRequest.Response.RawHeaders, True);
+     atempResponse.Position := 0;
+     tempResponse.CopyFrom(atempResponse, atempResponse.Size);
+     FreeAndNil(atempResponse);
+     tempResponse.Position := 0;
+     If Not IgnoreEvents Then
+     If Assigned(OnAfterRequest) then
+      OnAfterRequest(AUrl, rtPost, tempResponse);
+    End
    Else
-    aString := atempResponse.DataString;
-   StringToStream(tempResponse, aString);
-   FreeAndNil(atempResponse);
-   tempResponse.Position := 0;
-   If Not IgnoreEvents Then
-   If Assigned(OnAfterRequest) then
-    OnAfterRequest(AUrl, rtPost, tempResponse);
+    Begin
+     HttpRequest.Post(AUrl, vTempHeaders, atempResponse);
+     Result:= HttpRequest.ResponseCode;
+     if Assigned(OnHeadersAvailable) then
+      OnHeadersAvailable(HttpRequest.Response.RawHeaders, True);
+     atempResponse.Position := 0;
+     CustomBody.CopyFrom(atempResponse, atempResponse.Size);
+     FreeAndNil(atempResponse);
+     CustomBody.Position := 0;
+     If Not IgnoreEvents Then
+     If Assigned(OnAfterRequest) then
+      OnAfterRequest(AUrl, rtPost, CustomBody);
+    End;
   Finally
    vTempHeaders.Free;
    If Assigned(tempResponse) Then
@@ -704,8 +720,6 @@ Begin
    If Assigned(atempResponse) Then
     FreeAndNil(atempResponse);
    SendParams.Free;
-   If Assigned(temp) Then
-    FreeAndNil(temp);
   End;
  Except
   On E: EIdHTTPProtocolException do
@@ -3209,7 +3223,6 @@ Var
   AResponseInfo.Redirect(Url);
  End;
 Begin
-// ResultStream    := TStringStream.Create('');
  vResponseHeader := TStringList.Create;
  vResponseString := '';
  {$IFNDEF FPC}
@@ -3273,12 +3286,10 @@ Begin
    Begin
     AResponseInfo.AuthRealm   := vAuthRealm;
     AResponseInfo.ContentType := vContentType;
-    {$IFNDEF FPC}
-     {$if CompilerVersion > 21}
-      If (sCharSet <> '') Then
-       AResponseInfo.CharSet := sCharSet;
-     {$IFEND}
-    {$ENDIF}
+    If Encoding = esUtf8 Then
+     AResponseInfo.CharSet := 'utf-8'
+    Else
+     AResponseInfo.CharSet := 'ansi';
     AResponseInfo.ResponseNo               := StatusCode;
     If (vResponseString <> '')   Or
        (ErrorMessage    <> '')   Then
@@ -3562,8 +3573,8 @@ Begin
  If (Value)                   And
     (Not (HTTPServer.Active)) Then
   Begin
-   if not Assigned(ServerMethodClass) then
-     raise Exception.Create(cServerMethodClassNotAssigned);
+    if not(Assigned(ServerMethodClass)) and (Self.GetDataRouteCount = 0) then
+      raise Exception.Create(cServerMethodClassNotAssigned);
 
    Try
     If (ASSLPrivateKeyFile <> '')     And
@@ -3607,15 +3618,6 @@ Begin
   End
  Else If Not(Value) Then
   Begin
-   If HTTPServer.Active Then
-    Begin
-     HTTPServer.Contexts.LockList;
-     Try
-      HTTPServer.Contexts.ClearAndFree;
-     Finally
-      HTTPServer.Contexts.UnlockList;
-     End;
-    End;
    HTTPServer.Active := False;
   End;
  Inherited SetActive(HTTPServer.Active);
@@ -4443,7 +4445,10 @@ Var
              {$IFEND}
              StringStream.Size := 0;
             {$ENDIF}
-            ResultData := TReplyOK;
+            if Params.ItemsString['MessageError'].AsString = trim('') then
+             ResultData   := TReplyOK
+            else
+             ResultData := Params.ItemsString['MessageError'].AsString;
            End
           Else
            Begin
@@ -4736,13 +4741,14 @@ Begin
      End;
    End;
  Finally
+  If Assigned(HttpRequest) Then
+   FreeAndNil(HttpRequest);
+
   If (vErrorMessage <> '') Then
    Begin
     Result := vErrorMessage;
     Raise Exception.Create(Result);
    End;
-  If Assigned(HttpRequest) Then
-   FreeAndNil(HttpRequest);
  End;
 End;
 

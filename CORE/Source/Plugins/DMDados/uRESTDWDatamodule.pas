@@ -119,209 +119,186 @@ End;
 Function  TServerMethodDataModule.GetAction(Var URL     : String;
                                             Var Params  : TRESTDWParams) : Boolean;
 Var
- I, A,vPosQuery : Integer;
- vIsQuery    : Boolean;
- vParamName,
+ I, A,
+ vPosQuery     : Integer;
+ vIsQuery      : Boolean;
  vTempRoute,
- vTempValue : String;
- ParamsURI : String;
-
+ vTempValue,
+ vTempParamsURI,
+ vTempURL,
+ ParamsURI     : String;
+ vParamMethods : TRESTDWParamsMethods;
  Procedure ParseParams;
  Var
-  vTempData,
-  vTempParams : String;
-  IBar, I,
-  ArraySize   : Integer;
-  JSONParam   : TJSONParam;
+  lst       : TStringList;
+  pAux1,
+  cAux1     : Integer;
+  sAux1,
+  sAux2     : string;
+  JSONParam : TJSONParam;
  Begin
-  If vIsQuery Then
-   ArraySize   := CountExpression(ParamsURI, '&')
-  Else
-   Begin
-    ArraySize   := CountExpression(ParamsURI, '/');
-    If ArraySize > 0 Then
-     Dec(ArraySize);
-   End;
-  If ArraySize  = 0 Then
-   Begin
-    If Length(ParamsURI) > 0 Then
-     ArraySize := 1;
-   End
-  Else
-   ArraySize   := ArraySize + 1;
-  vTempParams  := ParamsURI;
-  For I := 0 To ArraySize -1 Do
-   Begin
-    JSONParam := Nil;
-    If vIsQuery Then
-     Begin
-      IBar     := Pos('&', vTempParams);
-      If IBar = 0 Then
-       Begin
-        IBar    := Length(vTempParams);
-        vTempData := Copy(vTempParams, 1, IBar);
-       End
-      Else
-       vTempData := Copy(vTempParams, 1, IBar - 1);
-      If Pos('dwmark:', vTempData) = 0 Then
-       Begin
-        vParamName := Copy(vTempData, 1, Pos('=', vTempData) - 1);
-        If vParamName <> '' Then
-         Begin
-          JSONParam  := Params.ItemsString[vParamName];
-          If JSONParam = Nil Then
-           Begin
-            Delete(vTempData, 1, Pos('=', vTempData));
-            JSONParam := TJSONParam.Create(Params.Encoding);
-            JSONParam.ParamName := cUndefined;//Format('PARAM%d', [0]);
-            JSONParam.ObjectDirection := odIN;
-            JSONParam.SetValue(vTempValue);
-            Params.Add(JSONParam);
-           End;
-         End;
-       End;
-      Delete(vTempParams, 1, IBar);
-     End
-    Else
-     Begin
-      vParamName := IntToStr(I);
-      If vParamName <> '' Then
-       Begin
-        If Pos('/', vTempParams) > 0 Then
-         Begin
-          If vTempParams[InitStrPos] = '/' Then
-           Delete(vTempParams, 1, 1);
-          vTempValue := Copy(vTempParams, 1, Pos('/', vTempParams) - 1);
-          Delete(vTempParams, 1, Pos('/', vTempParams));
-         End
-        Else
-         vTempValue := vTempParams;
-        JSONParam  := Params.ItemsString[vParamName];
-        If JSONParam = Nil Then
-         Begin
-          JSONParam := TJSONParam.Create(Params.Encoding);
-          JSONParam.ParamName := vParamName;
-          JSONParam.ObjectDirection := odIN;
-          If (vTempValue <> '') Then
-           JSONParam.SetValue(vTempValue);
-          Params.Add(JSONParam);
-         End
-        Else If Not(vIsQuery)         And
-                   (JSONParam.IsNull) And
-                   (vTempValue <> '') Then
-         JSONParam.SetValue(vTempValue);
-       End;
-     End;
-   End;
+  lst := TStringList.Create;
+  Try
+   pAux1 := Pos('?', ParamsURI);
+   // params com /
+   sAux1 := Copy(ParamsURI, 1, pAux1 - 1);
+   // params com &
+   sAux2 := Copy(ParamsURI, pAux1 + 1, Length(ParamsURI));
+   cAux1 := 0;
+   While (sAux1 <> '') Do
+    Begin
+     pAux1 := Pos('/', sAux1);
+     If pAux1 = 0 Then
+      pAux1 := Length(sAux1) + 1;
+     lst.Add(IntToStr(cAux1) + '=' + Copy(sAux1, 1, pAux1 - 1));
+     cAux1 := cAux1 + 1;
+     Delete(sAux1, 1, pAux1);
+    End;
+   While (sAux2 <> '') Do
+    Begin
+     pAux1 := Pos('&', sAux2);
+     If pAux1 = 0 then
+      pAux1 := Length(sAux2) + 1;
+     sAux1 := Copy(sAux2, 1, pAux1 - 1);
+     If Pos('dwmark:', sAux1) = 0 then
+      lst.Add(sAux1);
+     Delete(sAux2, 1, pAux1);
+    End;
+   While lst.Count > 0 Do
+    Begin
+     JSONParam  := Params.ItemsString[lst.Names[0]];
+     If JSONParam = Nil Then
+      Begin
+       JSONParam := TJSONParam.Create(Params.Encoding);
+       JSONParam.ParamName := lst.Names[0];
+       JSONParam.ObjectDirection := odIN;
+       JSONParam.SetValue(lst.ValueFromIndex[0]);
+       Params.Add(JSONParam);
+      End
+     Else If JSONParam.IsNull Then
+      JSONParam.SetValue(lst.ValueFromIndex[0]);
+     lst.Delete(0);
+    End;
+  Finally
+   FreeAndNil(lst);
+  End;
  End;
-
  Procedure CopyParams(SourceParams : TRESTDWParamsMethods);
  Var
-  I : Integer;
+  isrc       : Integer;
   vTempParam : TJSONParam;
  Begin
-  For I := 0 To SourceParams.Count -1 Do
+  For isrc := 0 To SourceParams.Count -1 Do
    Begin
-    If SourceParams.Items[I].ObjectDirection in [odIN, odINOUT] Then
+    If SourceParams.Items[isrc].ObjectDirection in [odIN, odINOUT] Then
      Begin
-      If Params.ItemsString[SourceParams.Items[I].ParamName] = Nil Then
+      If Params.ItemsString[SourceParams.Items[isrc].ParamName] = Nil Then
        Begin
         vTempParam := TJSONParam.Create(Params.Encoding);
-        vTempParam.CopyFrom(SourceParams.Items[I]);
+        vTempParam.CopyFrom(SourceParams.Items[isrc]);
         Params.Add(vTempParam);
        End;
      End;
    End;
  End;
-
- procedure ParseURL;
- begin
-   vPosQuery  := Pos('?', URL);
-   vIsQuery   := vPosQuery > 0;
-
-   ParamsURI := '';
-   if vIsQuery then begin
-     ParamsURI := Copy(URL,vPosQuery+1,Length(URL));
-     URL := Copy(URL,1,vPosQuery-1);
-   end;
-
-   // url igual http://localhost:8082/usuarios//?var=teste
-   while (URL <> '') and (URL[Length(URL)] in ['/','?']) do
-     Delete(URL,Length(URL),1);
-
-   // url http://localhost:8082/usuarios//login//?var=teste
-   while (Pos('//',URL) > 0) do
-     Delete(URL,Pos('//',URL),1);
-
-   // ParamsURI = /?teste=1
-   while (ParamsURI <> '') and (ParamsURI[InitStrPos] in ['/','?']) do
-     Delete(ParamsURI,InitStrPos,1);
-
-   if URL = '' then
-     URL := '/';
- end;
-
+ Procedure ParseURL;
+ Begin
+  vPosQuery := Pos('?', URL);
+  vIsQuery  := vPosQuery > 0;
+  ParamsURI := '';
+  If vIsQuery Then
+   Begin
+    ParamsURI := Copy(URL, vPosQuery + 1, Length(URL));
+    URL := Copy(URL, 1, vPosQuery - 1);
+   End;
+  // url igual http://localhost:8082/usuarios//?var=teste
+  While (URL <> '')       And
+        (URL[Length(URL)] In ['/', '?']) Do
+   Delete(URL, Length(URL), 1);
+  // url http://localhost:8082/usuarios//login//?var=teste
+  While (Pos('//', URL) > 0) Do
+   Delete(URL, Pos('//', URL), 1);
+  // ParamsURI = /?teste=1
+  While (ParamsURI <> '')      And
+        (ParamsURI[InitStrPos] In ['/', '?']) Do
+   Delete(ParamsURI, InitStrPos, 1);
+  If URL = '' Then
+   URL := '/';
+ End;
 Begin
  Result   := False;
  If Length(URL) = 0 Then
   Exit;
-
  ParseURL;
-
  vTempValue := URL;
-
  For I := 0 To ComponentCount -1 Do
   Begin
-   If (Components[i] is TRESTDWServerEvents) Or
-      (Components[i] is TRESTDWServerContext)  Then
-    Begin
-     If (Components[i] is TRESTDWServerEvents) Then
-      Begin
-       For A := 0 To TRESTDWServerEvents(Components[I]).Events.Count -1 Do
-        Begin
-         vTempRoute := TRESTDWServerEvents(Components[I]).Events[A].BaseURL   +
-                       TRESTDWServerEvents(Components[I]).Events[A].EventName;
-         Result     := SameText(vTempRoute, vTempValue);
+    if (Components[i] is TRESTDWServerEvents) then begin
+      for A := 0 To TRESTDWServerEvents(Components[I]).Events.Count -1 do begin
+        vTempRoute := TRESTDWServerEvents(Components[I]).Events[A].BaseURL   +
+                      TRESTDWServerEvents(Components[I]).Events[A].EventName;
 
-         If Result Then
-          Begin
-           CopyParams(TRESTDWServerEvents(Components[I]).Events[A].Params);
-           Break;
-          End;
-        End;
-      End
-     Else
-      Begin
-       For A := 0 To TRESTDWServerContext(Components[I]).ContextList.Count -1 Do
-        Begin
-         vTempRoute := TRESTDWServerContext(Components[I]).ContextList[A].BaseURL   +
-                       TRESTDWServerContext(Components[I]).ContextList[A].ContextName;
-         If ((vTempValue = '/') Or (vTempValue = '')) Then
-          Begin
-           If TRESTDWServerContext(Components[I]).DefaultContext <> '' Then
-            Begin
-             vTempValue := TRESTDWServerContext(Components[I]).DefaultContext;
-             If vTempValue[InitStrPos] <> '/' Then
+        if ((vTempValue = '/') or (vTempValue = '')) then begin
+          if TRESTDWServerEvents(Components[I]).DefaultEvent <> '' then begin
+            vTempValue := TRESTDWServerEvents(Components[I]).DefaultEvent;
+            if vTempValue[InitStrPos] <> '/' then
               vTempValue :=  '/' + vTempValue;
-            End;
-          End;
-         Result     := SameText(vTempRoute, vTempValue);
-         If Result Then
-          Begin
-           CopyParams(TRESTDWServerContext(Components[I]).ContextList[A].Params);
-           Break;
-          End;
-        End;
-      End;
+          end;
+        end;
 
-     If Result Then
-      Begin
-       ParseParams;
-       Break;
-      End;
+        if SameText(vTempRoute, vTempValue) then begin
+          Result := True;
+          vTempURL := vTempRoute;
+          vTempParamsURI := '';
+          vParamMethods := TRESTDWServerEvents(Components[I]).Events[A].Params;
+          Break;
+        end
+        else if SameText(vTempRoute, Copy(vTempValue, 1, Length(vTempRoute))) then begin
+          Result := True;
+          vTempURL := vTempRoute;
+          vTempParamsURI := Copy(vTempValue,Length(vTempRoute) + 2, Length(vTempValue));
+          vParamMethods := TRESTDWServerEvents(Components[I]).Events[A].Params;
+        end;
+      end;
+    end
+    Else If (Components[i] Is TRESTDWServerContext) Then
+     Begin
+      For A := 0 To TRESTDWServerContext(Components[I]).ContextList.Count - 1 Do
+       Begin
+        vTempRoute := TRESTDWServerContext(Components[I]).ContextList[A].BaseURL   +
+                      TRESTDWServerContext(Components[I]).ContextList[A].ContextName;
+        If SameText(vTempRoute, vTempValue) Then
+         Begin
+          Result := True;
+          vTempURL := vTempRoute;
+          vTempParamsURI := '';
+          vParamMethods := TRESTDWServerContext(Components[I]).ContextList[A].Params;
+          Break;
+         End
+        Else If SameText(vTempRoute, Copy(vTempValue, 1, Length(vTempRoute))) Then
+         Begin
+          Result := True;
+          vTempURL := vTempRoute;
+          vTempParamsURI := Copy(vTempValue, Length(vTempRoute) + 2, Length(vTempValue));
+          vParamMethods := TRESTDWServerContext(Components[I]).ContextList[A].Params;
+         End;
+       End;
+     End;
+   If Result Then
+    Begin
+     CopyParams(vParamMethods);
+     URL := vTempURL;
+     ParamsURI := '?' + ParamsURI;
+     ParamsURI := vTempParamsURI + ParamsURI;
+     ParseParams;
+     Break;
     End;
   End;
-End;
+ If (Not Result)  And
+    ((URL = '')   Or
+     (URL = '/')) Then
+  URL := '';
+end;
 
 Procedure TServerMethodDataModule.SetClientInfo(ip,
                                                 UserAgent,
@@ -374,5 +351,5 @@ Begin
  vBaseRequest := BaseRequest;
 End;
 
-end.
+End.
 

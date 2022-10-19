@@ -26,18 +26,17 @@ unit uRESTDWBasicDB;
 interface
 
 Uses
- {$IFDEF RESTDWUNIDACMEM}DADump, UniDump, VirtualTable, MemDS,{$ENDIF}
+ {$IFDEF RESTDWUNIDACMEM}DADump, UniDump, VirtualTable, {$ENDIF}
  {$IFDEF RESTKBMMEMTABLE}kbmmemtable, {$ENDIF}
  {$IFDEF FPC}
-  {$IFNDEF RESTDWLAMW}memds, BufDataset, {$ENDIF}
-  {$IFDEF RESTDWLAZDRIVER}memds,{$ENDIF}
-  uRESTDWCharset,
+  {$IFNDEF RESTDWLAMW}BufDataset, {$ENDIF}
+  memds, uRESTDWCharset,
  {$ELSE}
   {$IF Defined(RESTDWFMX)}
    {$IFNDEF RESTDWAndroidService}System.UITypes, {$ENDIF}
   {$IFEND}
    {$IFDEF RESTDWCLIENTDATASET}DBClient, {$ENDIF}
-   {$IF CompilerVersion > 22} // Delphi 2010 pra cima
+   {$IF CompilerVersion > 23} // Delphi Xe3 pra cima
     {$IFDEF RESTDWFDMEMTABLE}
      FireDAC.Stan.Intf, FireDAC.Stan.Option, FireDAC.Stan.Param,
      FireDAC.Stan.Error, FireDAC.DatS, FireDAC.Phys.Intf, FireDAC.DApt.Intf,
@@ -47,11 +46,11 @@ Uses
     {$IFDEF RESTDWADMEMTABLE}
      uADStanIntf, uADStanOption, uADStanParam, uADStanError, uADPhysIntf,
      uADDAptIntf, uADCompDataSet, uADCompClient,
-      {$IF CompilerVersion > 26}uADStanStorageBin,{$IFEND}
+    {$IF CompilerVersion > 26}uADStanStorageBin,{$IFEND}
     {$ENDIF}
    {$IFEND}
  {$ENDIF}
- SysUtils,  Classes, Db, SyncObjs, Variants,
+ SysUtils, Classes, Db, SyncObjs, Variants,
  uRESTDWDataUtils, uRESTDWComponentBase, uRESTDWBasicTypes, uRESTDWConsts,
  uRESTDWPoolermethod, uRESTDWComponentEvents, uRESTDWResponseTranslator,
  uRESTDWBasicClass, uRESTDWJSONObject, uRESTDWParams, uRESTDWBasic,
@@ -355,6 +354,7 @@ Type
   vStrsTrim,
   vStrsEmpty2Null,
   vStrsTrim2Len,
+  vIgnoreEchoPooler,
   vParamCreate          : Boolean;
   vTypeRequest          : Ttyperequest;
   vFailOverConnections  : TListDefConnections;
@@ -494,6 +494,7 @@ Type
   Property CriptOptions            : TCripto                    Read vCripto                  Write vCripto;
   Property DataRoute               : String                     Read vDataRoute               Write SetDataRoute;
   Property MyIP                    : String                     Read vMyIP                    Write SetMyIp;
+  Property IgnoreEchoPooler        : Boolean                    Read vIgnoreEchoPooler        Write vIgnoreEchoPooler;
   Property AuthenticationOptions   : TRESTDWClientAuthOptionParams Read vAuthOptionParams     Write vAuthOptionParams;
   Property Proxy                   : Boolean                    Read vProxy                   Write vProxy;             //Diz se tem servidor Proxy
   Property ProxyOptions            : TProxyOptions              Read vProxyOptions            Write vProxyOptions;      //Se tem Proxy diz quais as opções
@@ -4167,6 +4168,7 @@ End;
 Constructor TRESTDWDatabasebaseBase.Create(AOwner : TComponent);
 Begin
  Inherited;
+ vIgnoreEchoPooler         := False;
  vRESTClientPooler         := Nil;
  vUseSSL                   := False;
  vHandleRedirects          := False;
@@ -5050,7 +5052,10 @@ Begin
    Connection.BinaryRequest        := vRESTClientPooler.BinaryRequest;
    TokenValidade;
    If Not(vErrorBoolean) Then
-    vTempSend  := Connection.EchoPooler(vDataRoute, vRestPooler, vTimeOut, vConnectTimeOut, vRESTClientPooler);
+    If vIgnoreEchoPooler Then
+     vTempSend := '127.0.0.1'
+    else
+     vTempSend  := Connection.EchoPooler(vDataRoute, vRestPooler, vTimeOut, vConnectTimeOut, vRESTClientPooler);
    Result      := Trim(vTempSend) <> '';
    If Result Then
     vMyIP       := vTempSend
@@ -5109,11 +5114,14 @@ Begin
            Try
             TokenValidade;
             If Not(vErrorBoolean) Then
-             vTempSend   := Connection.EchoPooler(vFailOverConnections[I].vDataRoute,
-                                                  vFailOverConnections[I].vRestPooler,
-                                                  vFailOverConnections[I].vTimeOut,
-                                                  vFailOverConnections[I].vConnectTimeOut,
-                                                  vRESTClientPooler);
+             If vIgnoreEchoPooler Then
+              vTempSend := '127.0.0.1'
+             else
+              vTempSend   := Connection.EchoPooler(vFailOverConnections[I].vDataRoute,
+                                                   vFailOverConnections[I].vRestPooler,
+                                                   vFailOverConnections[I].vTimeOut,
+                                                   vFailOverConnections[I].vConnectTimeOut,
+                                                   vRESTClientPooler);
             Result      := Trim(vTempSend) <> '';
             If Result Then
              Begin
@@ -5205,7 +5213,10 @@ Begin
            Try
             TokenValidade;
             If Not(vErrorBoolean) Then
-             vTempSend   := Connection.EchoPooler(vFailOverConnections[I].vDataRoute,
+             If vIgnoreEchoPooler Then
+              vTempSend := '127.0.0.1'
+             else
+              vTempSend   := Connection.EchoPooler(vFailOverConnections[I].vDataRoute,
                                                    vFailOverConnections[I].vRestPooler,
                                                    vFailOverConnections[I].vTimeOut,
                                                    vFailOverConnections[I].vConnectTimeOut,
@@ -8421,7 +8432,7 @@ Begin
     TMemDataset(Self).CreateTable;
     TMemDataset(Self).Open;
    {$ENDIF}
-   {$IFDEF UNIDACMEM}
+   {$IFDEF RESTDWUNIDACMEM}
     TVirtualTable(Self).Close;
     TVirtualTable(Self).Open;
    {$ENDIF}
@@ -8430,7 +8441,7 @@ Begin
    TClientDataset(Self).CreateDataSet;
    TClientDataset(Self).Open;
   {$ENDIF}
-  {$IFDEF UNIDACMEM}
+  {$IFDEF RESTDWUNIDACMEM}
    TVirtualTable(Self).Close;
    TVirtualTable(Self).Open;
   {$ENDIF}
@@ -8478,7 +8489,7 @@ Begin
     TMemDataset(Self).CreateTable;
     TMemDataset(Self).Open;
    {$ENDIF}
-   {$IFDEF UNIDACMEM}
+   {$IFDEF RESTDWUNIDACMEM}
     TVirtualTable(Self).Close;
     TVirtualTable(Self).Open;
    {$ENDIF}
@@ -8487,7 +8498,7 @@ Begin
     TClientDataset(Self).CreateDataSet;
     TClientDataset(Self).Open;
    {$ENDIF}
-   {$IFDEF UNIDACMEM}
+   {$IFDEF RESTDWUNIDACMEM}
     TVirtualTable(Self).Close;
     TVirtualTable(Self).Open;
    {$ENDIF}
@@ -9510,7 +9521,7 @@ Begin
     TRESTDWMemtable(Self).Close;
     TRESTDWMemtable(Self).Open;
    {$ELSE}
-    {$IFNDEF UNIDACMEM}
+    {$IFNDEF RESTDWUNIDACMEM}
      If Self is TMemDataset Then
       TMemDataset(Self).CreateTable;
     {$ELSE}
@@ -9541,7 +9552,7 @@ Begin
     TRESTDWMemtable(Self).Close;
     TRESTDWMemtable(Self).Open;
    {$ELSE}
-    {$IFNDEF UNIDACMEM}
+    {$IFNDEF RESTDWUNIDACMEM}
      If Self is TMemDataset Then
       TMemDataset(Self).CreateTable;
     {$ELSE}
