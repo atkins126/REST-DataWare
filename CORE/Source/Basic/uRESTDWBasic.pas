@@ -27,24 +27,17 @@ interface
 
 Uses
  {$IFDEF FPC}
- SysUtils,      Classes, Db, Variants,
- uRESTDWDataUtils,     uRESTDWComponentEvents, uRESTDWBasicTypes, uRESTDWJSONObject,
- uRESTDWParams, uRESTDWMassiveBuffer, uRESTDWCharset, uRESTDWEncodeClass, uRESTDWConsts,
- syncobjs, uRESTDWComponentBase, uzliblaz
+  uzliblaz,
  {$ELSE}
-  {$IF CompilerVersion <= 22}
-   SysUtils, Classes, Db, Variants, EncdDecd, SyncObjs, uRESTDWDataUtils, uRESTDWComponentEvents, uRESTDWBasicTypes, uRESTDWJSONObject,
-   uRESTDWParams, uRESTDWMassiveBuffer, uRESTDWEncodeClass, uRESTDWComponentBase
-  {$ELSE}
-   System.SysUtils, System.Classes, Data.Db, Variants, system.SyncObjs, uRESTDWDataUtils, uRESTDWComponentEvents, uRESTDWBasicTypes, uRESTDWJSONObject,
-   uRESTDWParams, uRESTDWMassiveBuffer, uRESTDWEncodeClass, uRESTDWComponentBase,
-   {$IF Defined(RESTDWFMX)}
-    System.IOUtils,
-   {$IFEND}
-   uRESTDWCharset
-  {$IFEND}
-   , uRESTDWConsts
- {$ENDIF}, uRESTDWMessageCoderMIME;
+  {$IF CompilerVersion <= 22}EncdDecd,{$IFEND}
+  {$IF Defined(RESTDWFMX)}System.IOUtils,{$IFEND}
+ {$ENDIF}
+ SysUtils, Classes, Db, Variants, SyncObjs,
+ uRESTDWComponentEvents, uRESTDWBasicTypes, uRESTDWJSONObject, uRESTDWParams,
+ uRESTDWMassiveBuffer, uRESTDWEncodeClass, uRESTDWDataUtils,
+ uRESTDWComponentBase, uRESTDWConsts, uRESTDWMessageCoderMIME
+
+ ;
 
  type
   TRedirect = Procedure(Url : String;
@@ -1635,7 +1628,6 @@ Var
  aToken,
  vToken,
  vDataBuff,
- vCORSOption,
  vUrlToExec,
  vOldRequest,
  vdwservereventname,
@@ -1955,7 +1947,11 @@ Var
   Else If (Pos('DELETE ', UpperCase(Result)) > 0)   Then
    Result := StringReplace(Result, 'DELETE ', '', [rfReplaceAll, rfIgnoreCase])
   Else If (Pos('PATCH ', UpperCase(Result)) > 0)   Then
-   Result := StringReplace(Result, 'PATCH ', '', [rfReplaceAll, rfIgnoreCase]);
+   Result := StringReplace(Result, 'PATCH ', '', [rfReplaceAll, rfIgnoreCase])
+  Else If (Pos('OPTION ', UpperCase(Result)) > 0)   Then
+   Result := StringReplace(Result, 'OPTION ', '', [rfReplaceAll, rfIgnoreCase])
+  Else If (Pos('OPTIONS ', UpperCase(Result)) > 0)   Then
+   Result := StringReplace(Result, 'OPTIONS ', '', [rfReplaceAll, rfIgnoreCase]);
  End;
  Function CompareBaseURL(Var Value : String) : Boolean;
  Var
@@ -2114,12 +2110,12 @@ Begin
   Cmd := StringReplace(Cmd, ' HTTP/1.1', '', [rfReplaceAll]);
   Cmd := StringReplace(Cmd, ' HTTP/2.0', '', [rfReplaceAll]);
   Cmd := StringReplace(Cmd, ' HTTP/2.1', '', [rfReplaceAll]);
-  vCORSOption := UpperCase(Copy(Cmd, 1, 7));
   If (UpperCase(Copy (Cmd, 1, 3)) = 'GET' )   OR
      (UpperCase(Copy (Cmd, 1, 4)) = 'POST')   OR
      (UpperCase(Copy (Cmd, 1, 3)) = 'PUT')    OR
      (UpperCase(Copy (Cmd, 1, 4)) = 'DELE')   OR
-     (UpperCase(Copy (Cmd, 1, 4)) = 'PATC')   Then
+     (UpperCase(Copy (Cmd, 1, 4)) = 'PATC')   OR
+     (UpperCase(Copy (Cmd, 1, 4)) = 'OPTI')   Then
    Begin
     RequestType := rtGet;
     If (UpperCase(Copy (Cmd, 1, 4))      = 'POST') Then
@@ -2129,7 +2125,9 @@ Begin
     Else If (UpperCase(Copy (Cmd, 1, 4)) = 'DELE') Then
      RequestType := rtDelete
     Else If (UpperCase(Copy (Cmd, 1, 4)) = 'PATC') Then
-     RequestType := rtPatch;
+     RequestType := rtPatch
+    Else If (UpperCase(Copy (Cmd, 1, 4)) = 'OPTI') Then
+     RequestType := rtOption;
     {$IFNDEF FPC}
      If {$IFNDEF FPC}{$IF (DEFINED(OLDINDY))}Url
                                       {$ELSE}Url{$IFEND}
@@ -2834,15 +2832,15 @@ Begin
               Begin
                If vEncoding = esUtf8 Then
                 Begin
-                 TRESTDWDataUtils.ParseDWParamsURL(utf8decode(TStringStream(mb).DataString), vEncoding, DWParams{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
+//                 TRESTDWDataUtils.ParseDWParamsURL(utf8decode(TStringStream(mb).DataString), vEncoding, DWParams{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
                  if DWParams.ItemsString['undefined'] = nil then
-                  TRESTDWDataUtils.ParseBodyRawToDWParam(utf8decode(TStringStream(mb).DataString), vEncoding, DWParams{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
+                  TRESTDWDataUtils.ParseBodyRawToDWParam(mb, vEncoding, DWParams{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
                 End
                Else
                 Begin
-                 TRESTDWDataUtils.ParseDWParamsURL(TStringStream(mb).DataString, vEncoding, DWParams{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
+//                 TRESTDWDataUtils.ParseDWParamsURL(TStringStream(mb).DataString, vEncoding, DWParams{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
                  if DWParams.ItemsString['undefined'] = nil then
-                  TRESTDWDataUtils.ParseBodyRawToDWParam(TStringStream(mb).DataString, vEncoding, DWParams{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
+                  TRESTDWDataUtils.ParseBodyRawToDWParam(mb, vEncoding, DWParams{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
                 End;
               End;
              {Fim alteração feita por Tiago Istuque - 28/12/2018}
@@ -3046,8 +3044,11 @@ Begin
          //TODO
 //         TServerMethodDatamodule(vTempServerMethods).SetClientInfo(ClientIP, UserAgent, vUriOptions.EventName, vUriOptions.ServerEvent, ClientPort);
          //Novo Lugar para Autenticação
-         If ((vCORS) And (vCORSOption <> 'OPTIONS')) Or
-             (vServerAuthOptions.AuthorizationOption in [rdwAOBasic, rdwAOBearer, rdwAOToken]) Then
+         If ((vCORS) And (RequestType = rtOption)) Then
+          vErrorCode            := cCORSPreflightCODE;
+         If ((vCORS)   And (RequestType <> rtOption)) Or
+             (((vCORS) And (RequestType <> rtOption)) And
+              (vServerAuthOptions.AuthorizationOption in [rdwAOBasic, rdwAOBearer, rdwAOToken])) Then
           Begin
            vAcceptAuth           := False;
            vErrorCode            := 401;
@@ -3560,12 +3561,14 @@ Begin
             vServerAuthOptions.CopyServerAuthParams(vRDWAuthOptionParam);
             TServerMethodDatamodule(vTempServerMethods).SetClientInfo(ClientIP, UserAgent, vUrlToExec, ClientPort);
            End;
-          If (Not (vGettoken)) And (Not (vTokenValidate)) Then
+          If (RequestType = rtOption) Then
+           Result := True
+          Else If (Not (vGettoken)) And (Not (vTokenValidate)) Then
            Begin
             If Not ServiceMethods(TComponent(vTempServerMethods), AContext, vUrlToExec, vdwservereventname, DWParams,
-                                  JSONStr, DataMode, vErrorCode,  vContentType, vServerContextCall, ServerContextStream,
-                                  vdwConnectionDefs,  EncodeStrings, vAccessTag, WelcomeAccept, RequestType, vMark,
-                                  vRequestHeader, vBinaryEvent, vMetadata, vBinaryCompatibleMode, vCompareContext) Or (lowercase(vContentType) = 'application/php') Then
+                                       JSONStr, DataMode, vErrorCode,  vContentType, vServerContextCall, ServerContextStream,
+                                       vdwConnectionDefs,  EncodeStrings, vAccessTag, WelcomeAccept, RequestType, vMark,
+                                       vRequestHeader, vBinaryEvent, vMetadata, vBinaryCompatibleMode, vCompareContext) Or (lowercase(vContentType) = 'application/php') Then
              Begin
               Result := False;
               If Not dwassyncexec Then
@@ -3704,20 +3707,23 @@ Begin
                     End;
                   End;
 //                 vErrorCode   := 200;
-                 If vBinaryEvent Then
-                  vReplyString := JSONStr
-                 Else
+                 If (RequestType <> rtOption) Then
                   Begin
-                   If Not(((vUrlToExec = '') Or (vUrlToExec = '/')) And (RequestType = rtGet)) Then
-                    If Not (WelcomeAccept) And (vErrorMessage <> '') Then
-                     Begin
-                      If vEncode_Errors then
-                       vReplyString := escape_chars(vErrorMessage)
+                   If vBinaryEvent Then
+                    vReplyString := JSONStr
+                   Else
+                    Begin
+                     If Not(((vUrlToExec = '') Or (vUrlToExec = '/')) And (RequestType = rtGet)) Then
+                      If Not (WelcomeAccept) And (vErrorMessage <> '') Then
+                       Begin
+                        If vEncode_Errors then
+                         vReplyString := escape_chars(vErrorMessage)
+                        Else
+                         vReplyString := vErrorMessage;
+                       End
                       Else
-                       vReplyString := vErrorMessage;
-                     End
-                    Else
-                     vReplyString := Format(TValueDisp, [GetParamsReturn(DWParams), JSONStr]);
+                       vReplyString := Format(TValueDisp, [GetParamsReturn(DWParams), JSONStr]);
+                    End;
                   End;
                 End
                Else If DataMode = dmRAW Then

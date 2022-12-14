@@ -26,18 +26,9 @@ unit uRESTDWBufferBase;
 
 interface
 
-Uses {$IFDEF FPC}
-      SysUtils, Classes
-     {$ELSE}
-      {$IF CompilerVersion <= 22}
-       SysUtils, Classes
-      {$ELSE}
-       System.SysUtils, System.Classes
-      {$IFEND}
-     {$ENDIF},
-     Variants,
-     uRESTDWBasicComponent,
-     uRESTDWBasicTypes;
+Uses
+  SysUtils, Classes, Variants,
+  uRESTDWBasicComponent, uRESTDWBasicTypes;
 
 Type
  TRESTDWBufferBase = Class(TObject)
@@ -87,7 +78,11 @@ Var
  aByte     : Byte;
  aLongWord : LongWord;
  aDouble   : Double;
+ {$IF (Not DEFINED(FPC)) AND (CompilerVersion < 21)}
+ aDate     : TDateTime;
+ {$ELSE}
  aDate     : TDate;
+ {$IFEND}
  S         : Integer;
  vSt       : Char;
  aString   : DWString;
@@ -166,7 +161,11 @@ Var
  aByte     : Byte;
  aLongWord : LongWord;
  aDouble   : Double;
+ {$IF (Not DEFINED(FPC)) AND (CompilerVersion < 21)}
+ aDate     : TDateTime;
+ {$ELSE}
  aDate     : TDate;
+ {$IFEND}
  S         : Integer;
  vSt       : Char;
  aString   : DWString;

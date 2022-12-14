@@ -30,8 +30,6 @@ interface
 Uses
   {$IF CompilerVersion <= 22}
    EncdDecd, uRESTDWMassiveBuffer,
-  {$ELSE}
-     uRESTDWCharset,
   {$IFEND}
   SysUtils, Classes, Db, Variants, HTTPApp, SyncObjs,
   uRESTDWBasic, uRESTDWJSONObject, uRESTDWBasicTypes, uRESTDWComponentEvents,
@@ -120,7 +118,7 @@ Begin
  vResponseString := '';
  vStream         := Nil;
  vRedirect       := Redirect;
- {$IF CompilerVersion > 23}
+ {$IF CompilerVersion > 26}
   ARequest.ReadTotalContent;
  {$IFEND}
  Try

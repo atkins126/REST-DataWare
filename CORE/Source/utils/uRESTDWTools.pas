@@ -27,17 +27,14 @@ interface
 
 Uses
  {$IFDEF FPC}
- Classes,  SysUtils, uRESTDWBasicTypes, LConvEncoding, lazutf8, Db
+ LConvEncoding, lazutf8,
  {$ELSE}
- Classes,  SysUtils, uRESTDWBasicTypes, Db, EncdDecd
-  {$IF Defined(RESTDWFMX)}
-   , IOUtils
-  {$IFEND}
-  {$IF CompilerVersion > 24}
-   , System.NetEncoding
-  {$IFEND}
- {$ENDIF},
- uRESTDWEncodeClass, uRESTDWCharset, uRESTDWMimeTypes;
+ EncdDecd,
+  {$IF Defined(RESTDWFMX)}IOUtils,{$IFEND}
+  {$IF CompilerVersion > 27}NetEncoding,{$IFEND}
+ {$ENDIF}
+ Classes, SysUtils, DB,
+ uRESTDWBasicTypes, uRESTDWEncodeClass, uRESTDWMimeTypes, uRESTDWConsts;
 
  Const
   B64Table      = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -341,11 +338,20 @@ Uses
  Function  GetStringEncode (Value : String; DatabaseCharSet : TDatabaseCharSet) : String;
  Function  GetStringDecode (Value : String; DatabaseCharSet : TDatabaseCharSet) : String;
  {$ENDIF}
+ Function RemoveLineBreaks(aText : string): string;
 
 Implementation
 
-Uses uRESTDWConsts, uRESTDWBase64, uRESTDWException{$IFNDEF HAS_FMX}{$IFNDEF UNIX}, Windows{$ENDIF}{$ENDIF};
+Uses uRESTDWBase64, uRESTDWException{$IFNDEF HAS_FMX}{$IFNDEF UNIX}, Windows{$ENDIF}{$ENDIF};
 
+
+Function RemoveLineBreaks(aText : string): string;//Gledston 03/12/2022  
+begin                                             //linha 3087 na Function EncodeBase64(AValue : TStream) : String;
+ { Retirando as quebras de linha em campos blob }
+ Result := StringReplace(aText, #$D#$A, '', [rfReplaceAll]);
+ { Retirando as quebras de linha em campos blob }
+ Result := StringReplace(Result, #13#10, '', [rfReplaceAll]);
+end;
 
 {$IFDEF FPC}
 Function  GetStringUnicode(Value : String) : String;
@@ -3008,7 +3014,7 @@ Begin
    {$IFDEF FPC}
     Result := TRESTDWBytes(TEncoding.ANSI.GetBytes(Astr));
    {$ELSE}
-    {$IF CompilerVersion < 22}
+    {$IF CompilerVersion < 23}
      SetLength(Result, Length(AStr));
      Move(Pointer(@AStr[InitStrPos])^, Pointer(Result)^, Length(AStr));
     {$ELSE}
@@ -3040,7 +3046,7 @@ Begin
   {$IFDEF FPC}
    SetString(Result, PAnsiChar(LBytes), restdwLength(LBytes));
   {$ELSE}
-   {$IF CompilerVersion < 22}
+   {$IF CompilerVersion < 23}
     SetString(Result, PAnsiChar(LBytes), restdwLength(LBytes));
    {$ELSE}
     {$IFDEF MSWINDOWS}
@@ -3063,7 +3069,7 @@ Begin
   {$IFDEF FPC}
    SetString(Result, PAnsiChar(bin), I);
   {$ELSE}
-   {$IF CompilerVersion < 22}
+   {$IF CompilerVersion < 23}
     SetString(Result, PAnsiChar(bin), I);
    {$ELSE}
     {$IFDEF MSWINDOWS}
@@ -3089,7 +3095,7 @@ Function EncodeStream (Value : TStream) : String;
      StreamDecoded.CopyFrom(AValue, AValue.Size);
      StreamDecoded.Position := 0;
      EncdDecd.EncodeStream(StreamDecoded, StreamEncoded);
-     Result := StreamEncoded.DataString;
+     Result := RemoveLineBreaks( StreamEncoded.DataString ); //Gledston 03/12/2022
     Finally
      StreamEncoded.Free;
      StreamDecoded.Free;
@@ -3158,11 +3164,6 @@ End;
 Function Decode64(const S: string): string;
 Var
  sa : String;
- {$IFNDEF FPC}
-  {$IF CompilerVersion > 24}
-   ne: TBase64Encoding;
-  {$IFEND}
- {$ENDIF}
 Begin
  If (Trim(S) <> '')   And
     (Trim(S) <> '""') Then
@@ -3170,20 +3171,7 @@ Begin
    SA := S;
    If Pos(sLineBreak, SA) > 0 Then
     SA := StringReplace(SA, sLineBreak, '', [rfReplaceAll]);
-   {$IFDEF FPC}
     Result := BytesToString(Base64Decode(SA));
-   {$ELSE}
-    {$IF CompilerVersion > 24}
-     ne     := TBase64Encoding.Create(-1, '');
-     Try
-      Result := ne.Decode(SA);
-     Finally
-      FreeAndNil(ne);
-     End;
-    {$ELSE}
-     Result := BytesToString(Base64Decode(SA));
-    {$IFEND}
-   {$ENDIF}
   End;
 End;
 
@@ -3233,7 +3221,7 @@ Function EncodeBase64(Const Value : String) : String;
 Var
  vValue : String;
  {$IFNDEF FPC}
-  {$IF CompilerVersion > 24}
+  {$IF CompilerVersion > 27}
    Ne : TBase64Encoding;
   {$IFEND}
  {$ENDIF}
@@ -3258,7 +3246,7 @@ Begin
  {$IFDEF FPC}
   Result := Base64Encode(Value);
  {$ELSE}
-  {$IF CompilerVersion > 24}
+  {$IF CompilerVersion > 27}
    Ne      := TBase64Encoding.Create(-1, '');
    Try
     Result := Ne.Encode(Value);

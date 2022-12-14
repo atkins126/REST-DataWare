@@ -1,10 +1,12 @@
 unit uRESTDWDynamic;
 
+{$I ..\..\Source\Includes\uRESTDWPlataform.inc}
+
 Interface
 
 Uses
- SysUtils, Classes, TypInfo, RTLConsts
- {$IFNDEF FPC}{$IF CompilerVersion < 21}, Windows{$IFEND}{$ENDIF};
+  {$IFDEF RESTDWWINDOWS}Windows,{$ENDIF}
+  SysUtils, Classes, TypInfo, RTLConsts;
 
 Type
  {$IFNDEF FPC}
