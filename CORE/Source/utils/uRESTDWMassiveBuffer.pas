@@ -1,6 +1,6 @@
 unit uRESTDWMassiveBuffer;
 
-{$I ..\..\Source\Includes\uRESTDWPlataform.inc}
+{$I ..\Includes\uRESTDW.inc}
 
 {
   REST Dataware .
@@ -15,7 +15,6 @@ unit uRESTDWMassiveBuffer;
 
  XyberX (Gilberto Rocha)    - Admin - Criador e Administrador  do pacote.
  Alexandre Abbade           - Admin - Administrador do desenvolvimento de DEMOS, coordenador do Grupo.
- Anderson Fiori             - Admin - Gerencia de Organização dos Projetos
  Flávio Motta               - Member Tester and DEMO Developer.
  Mobius One                 - Devel, Tester and Admin.
  Gustavo                    - Criptografia and Devel.
@@ -23,28 +22,36 @@ unit uRESTDWMassiveBuffer;
  Roniery                    - Devel.
 }
 
+{$IFNDEF RESTDWLAZARUS}
+ {$IFDEF FPC}
+  {$MODE OBJFPC}{$H+}
+ {$ENDIF}
+{$ENDIF}
+
 interface
 
 uses
   SysUtils, Classes, Variants, DB,
-  uRESTDWParams, uRESTDWConsts, uRESTDWBasicTypes, uRESTDWJSONInterface,
-  uRESTDWJSONObject, uRESTDWComponentBase, uRESTDWEncodeClass, uRESTDWBufferBase;
+  uRESTDWParams, uRESTDWConsts, uRESTDWBasicTypes, uRESTDWProtoTypes, uRESTDWJSONInterface,
+  uRESTDWJSONObject, uRESTDWBufferBase, uRESTDWAbout;
 
 Const
  cJSONValue = '{"MassiveSQLMode":"%s", "SQL":"%s", "Params":"%s", "Bookmark":"%s", ' +
                '"BinaryRequest":"%s", "FetchRowSQL":"%s", "LockSQL":"%s", "UnlockSQL":"%s"}';
 
 Type
+  TMassiveDataset  = Class
+End;
+
  TMassiveType = (mtMassiveCache, mtMassiveObject);
 
-Type
  TMassiveValue = Class(TObject)
  Private
   vIsNull,
   vModified,
   vBinary     : Boolean;
-  vJSONValue  : TJSONValue;
-  {$IFDEF FPC}
+  vJSONValue  : TRESTDWJSONValue;
+  {$IFDEF RESTDWLAZARUS}
    vDatabaseCharSet : TDatabaseCharSet;
   {$ENDIF}
   vValueName   : String;
@@ -63,6 +70,7 @@ Type
   Destructor  Destroy;Override;
   Function    IsNull : Boolean;
   Function    AsString : String;
+  Procedure   CopyValue     (aValue : TMassiveValue);
   Procedure   LoadFromStream(Stream : TMemoryStream);
   Procedure   SaveToStream  (Const Stream : TMemoryStream);
   Property    ValueName   : String       Read vValueName   Write vValueName;
@@ -71,13 +79,12 @@ Type
   Property    Value       : Variant      Read GetValue     Write SetValue;
   Property    Binary      : Boolean      Read vBinary      Write vBinary;
   Property    Modified    : Boolean      Read vModified;
-  {$IFDEF FPC}
+  {$IFDEF RESTDWLAZARUS}
   Property DatabaseCharSet : TDatabaseCharSet Read vDatabaseCharSet Write vDatabaseCharSet;
   {$ENDIF}
   Property Encoding          : TEncodeSelect  Read vEncoding        Write SetEncoding;
 End;
 
-Type
  PMassiveValue  = ^TMassiveValue;
  TMassiveValues = Class(TList)
  Private
@@ -92,7 +99,6 @@ Type
   Property   Items[Index  : Integer]       : TMassiveValue Read GetRec Write PutRec; Default;
 End;
 
-Type
  TMassiveField = Class(TObject)
  Private
   vMassiveFields : TList;
@@ -111,6 +117,7 @@ Type
   Function    GetOldValue    : Variant;
   Procedure   SetValue(Value : Variant);
   Function    GetModified    : Boolean;
+  Procedure   SetFieldType(Value : TObjectValue);
  Protected
  Public
   Constructor Create(MassiveFields : TList; FieldIndex : Integer);
@@ -122,7 +129,7 @@ Type
   Property    AutoGenerateValue : Boolean      Read vAutoGenerateValue Write vAutoGenerateValue;
   Property    KeyField          : Boolean      Read vKeyField          Write vKeyField;
   Property    ReadOnly          : Boolean      Read vReadOnly          Write vReadOnly;
-  Property    FieldType         : TObjectValue Read vFieldType         Write vFieldType;
+  Property    FieldType         : TObjectValue Read vFieldType         Write SetFieldType;
   Property    FieldName         : String       Read vFieldName         Write vFieldName;
   Property    Size              : Integer      Read vSize              Write vSize;
   Property    Precision         : Integer      Read vPrecision         Write vPrecision;
@@ -131,7 +138,6 @@ Type
   Property    Modified          : Boolean      Read GetModified;
 End;
 
-Type
  PMassiveField  = ^TMassiveField;
  TMassiveFields = Class(TList)
  Private
@@ -142,15 +148,14 @@ Type
  Protected
  Public
   Constructor Create(MassiveDataset : TMassiveDataset);
-  Destructor Destroy;Override;
-  Procedure  Delete(Index : Integer);                          Overload;
-  Procedure  Delete(FieldName : String);                       Overload;
-  Function   Add   (Item  : TMassiveField) : Integer;          Overload;
-  Function   FieldByName(FieldName : String) : TMassiveField;
-  Property   Items[Index  : Integer]       : TMassiveField Read GetRec Write PutRec; Default;
+  Destructor  Destroy;Override;
+  Procedure   Delete(Index : Integer);                          Overload;
+  Procedure   Delete(FieldName : String);                       Overload;
+  Function    Add   (Item  : TMassiveField) : Integer;          Overload;
+  Function    FieldByName(FieldName : String) : TMassiveField;
+  Property    Items[Index  : Integer]       : TMassiveField Read GetRec Write PutRec; Default;
 End;
 
-Type
  TMassiveLine          = Class(TObject)
  Private
   vMassiveValues  : TMassiveValues;
@@ -164,17 +169,21 @@ Type
   Procedure  PutRec  (Index : Integer;  Item  : TMassiveValue);
   Function   GetRecPK(Index : Integer)        : TMassiveValue;
   Procedure  PutRecPK(Index : Integer;  Item  : TMassiveValue);
+  Function   GetChanges(Index : Integer)      : String;
+  Procedure  SetChanges(Index : Integer;
+                        Item  : String);
  Protected
  Public
   Constructor Create;
   Destructor  Destroy;Override;
   Procedure   ClearAll;
+  Function    UpdateFieldChangesCount         : Integer;
   Procedure   LoadFromStream      (Source     : TStream);
   Procedure   SaveToStream        (Var Dest      : TStream;
                                    MassiveBuffer : TObject = Nil);
   Property    Changes                         : TStringList    Read vChanges;
   Property    MassiveMode                     : TMassiveMode   Read vMassiveMode Write vMassiveMode;
-  Property    UpdateFieldChanges              : TStringList    Read vChanges     Write vChanges;
+  Property    UpdateFieldChanges[Index  : Integer] : String    Read GetChanges   Write SetChanges;
   Property    MassiveType                     : TMassiveType   Read vMassiveType Write vMassiveType;
   Property    Params                          : TRESTDWParams  Read vDWParams    Write vDWParams;
   Property    DataExec                        : TStringList    Read vDataExec    Write vDataExec;
@@ -182,7 +191,6 @@ Type
   Property    PrimaryValues[Index  : Integer] : TMassiveValue  Read GetRecPK     Write PutRecPK;
 End;
 
-Type
  PMassiveLine   = ^TMassiveLine;
  TMassiveBuffer = Class(TList)
  Private
@@ -193,14 +201,11 @@ Type
  Public
   Destructor Destroy;Override;
   Procedure  Delete(Index : Integer);                         Overload;
-  Procedure  LoadFromStream    (Source     : TStream);
-  Procedure  SaveToStream      (Const Dest : TStream);
   Function   Add   (Item  : TMassiveLine)  : Integer;         Overload;
   Property   Items[Index  : Integer]       : TMassiveLine Read GetRec Write PutRec; Default;
 End;
 
 //Massive reply queue
-Type
  PMassiveReplyValue = ^TMassiveReplyValue;
  TMassiveReplyValue = Class(TObject)
  Private
@@ -216,7 +221,6 @@ Type
   Property    ValueName : String  Read vValueName   Write vValueName;
 End;
 
-Type
  PMassiveReplyCache = ^TMassiveReplyCache;
  TMassiveReplyCache = Class(TList)
  Private
@@ -236,7 +240,6 @@ Type
   Property    Values[Index  : Integer] : TMassiveReplyValue  Read GetRec       Write PutRec;
 End;
 
-Type
  PMassiveReply = ^TMassiveReply;
  TMassiveReply = Class(TList)
  Private
@@ -267,7 +270,6 @@ Type
   Property   ItemsString[Index  : String]       : TMassiveReplyCache Read GetRecName Write PutRecName;
 End;
 
-Type
  TMassiveDatasetBuffer = Class(TMassiveDataset)
  Protected
   vLastOpen        : Integer;
@@ -285,7 +287,7 @@ Type
   vSequenceName,
   vSequenceField,
   vTableName       : String;
-  {$IFDEF FPC}
+  {$IFDEF RESTDWLAZARUS}
   vDatabaseCharSet : TDatabaseCharSet;
   {$ENDIF}
   vEncoding        : TEncodeSelect;
@@ -353,7 +355,7 @@ Type
   Property  Params          : TRESTDWParams        Read vDWParams        Write vDWParams;
   Property  TableName       : String               Read vTableName;
   Property  OnLoad          : Boolean              Read vOnLoad;
-  {$IFDEF FPC}
+  {$IFDEF RESTDWLAZARUS}
   Property DatabaseCharSet  : TDatabaseCharSet     Read vDatabaseCharSet Write vDatabaseCharSet;
   {$ENDIF}
   Property Encoding         : TEncodeSelect        Read vEncoding        Write SetEncoding;
@@ -368,10 +370,8 @@ Type
   Property Dataset          : TRESTDWClientSQLBase Read vDataset;
  End;
 
-Type
- TRESTDWMassiveCacheValue = String;
+ TRESTDWMassiveCacheValue = TStream;
 
-Type
  PMassiveCacheValue  = ^TRESTDWMassiveCacheValue;
  TRESTDWMassiveCacheList = Class(TList)
  Private
@@ -386,7 +386,6 @@ Type
   Property   Items[Index  : Integer]            : TRESTDWMassiveCacheValue Read GetRec Write PutRec; Default;
 End;
 
-Type
  TMassiveCacheDataset  = TDataset;
  PMassiveCacheDataset  = ^TMassiveCacheDataset;
  TRESTDWMassiveCacheDatasetList = Class(TList)
@@ -404,17 +403,15 @@ Type
   Property   Items      [Index  : Integer]  : TMassiveCacheDataset Read GetRec       Write PutRec; Default;
 End;
 
-Type
  TRESTDWMassiveCache = Class(TComponent)
  Private
   MassiveCacheList        : TRESTDWMassiveCacheList;
   MassiveCacheDatasetList : TRESTDWMassiveCacheDatasetList;
-  vReflectChanges         : Boolean;
   vMassiveType            : TMassiveType;
  Public
   Function    MassiveCount      : Integer;
-  Function    ToJSON            : String;
-  Procedure   Add(Value         : String;
+  Procedure   SaveToStream(Var aStream : TStream);
+  Procedure   Add(Value         : TStream;
                   Const Dataset : TDataset);
   Procedure   ProcessChanges(Value : String);
   Procedure   Clear;
@@ -422,10 +419,8 @@ Type
   Destructor  Destroy;Override;                      //Destroy a Classe
  Published
   Property    MassiveType       : TMassiveType Read vMassiveType    Write vMassiveType;
-  Property    ReflectChanges    : Boolean      Read vReflectChanges Write vReflectChanges;
 End;
 
-Type
  TRESTDWMassiveCacheSQLValue = Class(TCollectionItem)
  Private
   vMassiveSQLMode : TMassiveSQLMode;
@@ -459,7 +454,6 @@ Type
   Property Params                 : TParams           Read vParams         Write vParams;
 End;
 
-Type
  PMassiveCacheSQLValue  = ^TRESTDWMassiveCacheSQLValue;
  TRESTDWMassiveCacheSQLList = Class(TRESTDWOwnedCollection)
  Private
@@ -481,7 +475,6 @@ Type
   Property   Items[Index  : Integer] : TRESTDWMassiveCacheSQLValue Read GetRec    Write PutRec; Default;
 End;
 
-Type
  TRESTDWMassiveSQLCache = Class(TRESTDWComponent)
  Private
   vEncoding            : TEncodeSelect;
@@ -502,18 +495,18 @@ Type
   Property CachedList : TRESTDWMassiveCacheSQLList Read vMassiveCacheSQLList Write vMassiveCacheSQLList;
 End;
 
-Type
  TMassiveProcess     = Procedure(Var MassiveDataset : TMassiveDatasetBuffer;
                                  Var Ignore         : Boolean) Of Object;
  TMassiveEvent       = Procedure(Var MassiveDataset : TMassiveDatasetBuffer) Of Object;
  TMassiveLineProcess = Procedure(Var MassiveDataset : TMassiveDatasetBuffer;
                                  Dataset            : TDataset) Of Object;
 
+Function  MassiveSQLMode(aValue : TMassiveSQLMode) : String; overload;
+Function  MassiveSQLMode(aValue : String) : TMassiveSQLMode; overload;
+
 implementation
 
-
-Uses uRESTDWBasicDB, uRESTDWPoolermethod, PropertyPersist, uRESTDWTools;
-
+Uses uRESTDWBasicDB, uRESTDWPoolermethod, uRESTDWPropertyPersist, uRESTDWTools;
 
 Function removestr(Astr: string; Asubstr: string):string;
 Begin
@@ -588,13 +581,26 @@ Begin
    TMassiveDatasetBuffer(TMassiveFields(vMassiveFields).vMassiveDataset).vMassiveBuffer.Items[vRecNo -1].vMassiveValues.Items[vFieldIndex +1].ObjectValue    := vFieldType;
    TMassiveDatasetBuffer(TMassiveFields(vMassiveFields).vMassiveDataset).vMassiveBuffer.Items[vRecNo -1].vMassiveValues.Items[vFieldIndex +1].vJSONValue.ObjectValue := vFieldType;
    If Not TMassiveDatasetBuffer(TMassiveFields(vMassiveFields).vMassiveDataset).vMassiveBuffer.Items[vRecNo -1].vMassiveValues.Items[vFieldIndex +1].isnull Then
-    TMassiveDatasetBuffer(TMassiveFields(vMassiveFields).vMassiveDataset).vMassiveBuffer.Items[vRecNo -1].vMassiveValues.Items[vFieldIndex +1].OldValue      := TMassiveDatasetBuffer(TMassiveFields(vMassiveFields).vMassiveDataset).vMassiveBuffer.Items[vRecNo -1].vMassiveValues.Items[vFieldIndex +1].Value
+    TMassiveDatasetBuffer(TMassiveFields(vMassiveFields).vMassiveDataset).vMassiveBuffer.Items[vRecNo -1].vMassiveValues.Items[vFieldIndex +1].OldValue      := TMassiveDatasetBuffer(TMassiveFields(vMassiveFields).vMassiveDataset).vMassiveBuffer.Items[
+    vRecNo -1].vMassiveValues.Items[vFieldIndex +1].Value
    Else
     TMassiveDatasetBuffer(TMassiveFields(vMassiveFields).vMassiveDataset).vMassiveBuffer.Items[vRecNo -1].vMassiveValues.Items[vFieldIndex +1].OldValue      := Null;
    TMassiveDatasetBuffer(TMassiveFields(vMassiveFields).vMassiveDataset).vMassiveBuffer.Items[vRecNo -1].vMassiveValues.Items[vFieldIndex +1].Value          := Value;
    TMassiveDatasetBuffer(TMassiveFields(vMassiveFields).vMassiveDataset).vMassiveBuffer.Items[vRecNo -1].vMassiveValues.Items[vFieldIndex +1].SetModified(True);
    vIsNull := VarIsNull(Value);
   End;
+End;
+
+Procedure TMassiveField.SetFieldType(Value : TObjectValue);
+Var
+ vRecNo : Integer;
+Begin
+ vFieldType := Value;
+ vRecNo := TMassiveDatasetBuffer(TMassiveFields(vMassiveFields).vMassiveDataset).vRecNo;
+ If vRecNo <= 0 Then
+  TMassiveDatasetBuffer(TMassiveFields(vMassiveFields).vMassiveDataset).vRecNo := 1;
+ vRecNo := TMassiveDatasetBuffer(TMassiveFields(vMassiveFields).vMassiveDataset).vRecNo;
+ TMassiveDatasetBuffer(TMassiveFields(vMassiveFields).vMassiveDataset).vMassiveBuffer.Items[vRecNo -1].vMassiveValues.Items[vFieldIndex +1].vJSONValue.Encoded := False;
 End;
 
 Function TMassiveField.GetModified : Boolean;
@@ -656,7 +662,7 @@ Var
 Begin
  New(vItem);
  vItem^ := Item;
- Result := TList(Self).Add(vItem);
+ Result := Inherited Add(vItem);
 End;
 
 Procedure TMassiveFields.Delete(FieldName : String);
@@ -681,21 +687,21 @@ Begin
    If Assigned(TList(Self).Items[Index]) Then
     Begin
      If Assigned(TMassiveField(TList(Self).Items[Index]^)) Then
-      Begin
-       {$IFDEF FPC}
+     Begin
+       {$IF Defined(RESTDWLAZARUS) OR not Defined(DELPHI10_4UP)}
        FreeAndNil(TList(Self).Items[Index]^);
        {$ELSE}
-        {$IF CompilerVersion > 33}
-         FreeAndNil(TMassiveField(TList(Self).Items[Index]^));
-         {$ELSE}
-         FreeAndNil(TList(Self).Items[Index]^);
-        {$IFEND}
-       {$ENDIF}
-      End;
-     {$IFDEF FPC}
+       FreeAndNil(TMassiveField(TList(Self).Items[Index]^));
+       {$IFEND}
+     End;
+     {$IFDEF RESTDWLAZARUS}
       Dispose(PMassiveField(TList(Self).Items[Index]));
      {$ELSE}
-      Dispose(TList(Self).Items[Index]);
+      {$IFDEF FPC}
+       Dispose(PMassiveField(TList(Self).Items[Index]));
+      {$ELSE}
+       Dispose(TList(Self).Items[Index]);
+      {$ENDIF}
      {$ENDIF}
     End;
    TList(Self).Delete(Index);
@@ -708,7 +714,7 @@ Var
 Begin
  For I := Count -1 DownTo 0 Do
   Delete(I);
- Self.Clear;
+ Inherited Clear;
 End;
 
 Constructor TMassiveFields.Create(MassiveDataset: TMassiveDataset);
@@ -725,13 +731,37 @@ End;
 
 Function TMassiveFields.FieldByName(FieldName : String): TMassiveField;
 Var
- I : Integer;
+ I           : Integer;
+ vFieldName,
+ vFieldNameB : String;
+ vResult     : Boolean;
+ Function StrCompField(A, B : String) : Boolean;
+ Var
+  I,  X : Integer;
+ Begin
+  Result := Length(A) > 0;
+  X      := 0;
+  For I := 1 To Length(A) Do
+   Begin
+    Result := I <= Length(B);
+    If Result Then
+     Begin
+      Result := A[I] = B[X];
+      If Not Result Then
+       Break;
+     End
+    Else
+     Break;
+   End;
+ End;
 Begin
- Result := Nil;
+ Result      := Nil;
+ vFieldNameB := UpperCase(Trim(FieldName));
  For I := 0 To Self.Count -1 Do
   Begin
-   If LowerCase(TMassiveField(TList(Self).Items[I]^).vFieldName) =
-      LowerCase(FieldName) Then
+   vFieldName := UpperCase(Trim(Items[I].vFieldName));
+   vResult    := vFieldName = vFieldNameB;
+   If vResult Then
     Begin
      Result := TMassiveField(TList(Self).Items[I]^);
      Break;
@@ -754,13 +784,19 @@ End;
 
 { TMassiveValue }
 
+Procedure TMassiveValue.CopyValue(aValue : TMassiveValue);
+Begin
+ vJSONValue.Encoded := aValue.vJSONValue.Encoded;
+ Value              := aValue.vJSONValue.Value;
+End;
+
 Constructor TMassiveValue.Create;
 Begin
  vBinary    := False;
  vIsNull    := True;
  vModified  := False;
  vOldValue  := Null;
- vJSONValue := TJSONValue.Create;
+ vJSONValue := TRESTDWJSONValue.Create;
 End;
 
 Function   TMassiveValue.AsString : String;
@@ -847,7 +883,7 @@ Begin
  If vJSONValue <> Nil Then
   Begin
    vJSONValue.Binary  := vBinary;
-   {$IFDEF FPC}
+   {$IFDEF RESTDWLAZARUS}
    vJSONValue.DatabaseCharSet := csUndefined;
    {$ENDIF}
    vJSONValue.LoadFromStream(Stream);
@@ -857,9 +893,8 @@ End;
 
 Procedure TMassiveValue.SaveToStream(Const Stream: TMemoryStream);
 Begin
- vJSONValue.ObjectValue := ovBlob;
- vJSONValue.Encoded     := False;
- vJSONValue.SaveToStream(Stream, True);
+ vJSONValue.SaveToStream(Stream);
+ Stream.Position := 0;
 End;
 
 Procedure TMassiveValue.SetModified(Value : Boolean);
@@ -879,7 +914,7 @@ Begin
  If vJSONValue <> Nil Then
   Begin
    vJSONValue.Binary  := vBinary;
-   {$IFDEF FPC}
+   {$IFDEF RESTDWLAZARUS}
    vJSONValue.DatabaseCharSet := csUndefined;
    {$ENDIF}
    If vJSONValue.Binary Then
@@ -889,7 +924,7 @@ Begin
      vJSONValue.Encoded := True;
     End
    Else
-    vJSONValue.SetValue(Value);
+    vJSONValue.SetValue(Value, False);
   End;
  vIsNull := vJSONValue.IsNull;
 End;
@@ -918,13 +953,26 @@ Procedure TMassiveValues.Delete(Index: Integer);
 Begin
  If (Index < Self.Count) And (Index > -1) Then
   Begin
+   {$IFDEF RESTDWLAZARUS}
+   If Assigned(PMassiveValue(TList(Self).Items[Index])) Then
+    Begin
+     If Assigned(PMassiveValue(TList(Self).Items[Index])^) Then
+      Begin
+       Try
+        FreeAndNil(TList(Self).Items[Index]^);
+//        PMassiveValue(TList(Self).Items[Index])^.Free;
+        Dispose(PMassiveValue(TList(Self).Items[Index]));
+       Except
+       End;
+      End;
+    End;
+   {$ELSE}
    If Assigned(TList(Self).Items[Index]) Then
     Begin
      If Assigned(TMassiveValue(TList(Self).Items[Index]^)) Then
       Begin
        Try
-        If Assigned(TMassiveValue(TList(Self).Items[Index]^)) Then
-         FreeAndNil(TMassiveValue(TList(Self).Items[Index]^));
+        TMassiveValue(TList(Self).Items[Index]^).Free;
         {$IFDEF FPC}
          Dispose(PMassiveValue(TList(Self).Items[Index]));
         {$ELSE}
@@ -934,6 +982,7 @@ Begin
        End;
       End;
     End;
+   {$ENDIF}
    TList(Self).Delete(Index);
   End;
 End;
@@ -991,12 +1040,34 @@ Begin
   Result := TMassiveValue(TList(vMassiveValues).Items[Index]^);
 End;
 
+Function   TMassiveLine.GetChanges(Index : Integer)      : String;
+Begin
+ Result := '';
+ If vChanges <> Nil Then
+  If (Index < vChanges.Count) And (Index > -1) Then
+   Result := vChanges[Index];
+End;
+
+Procedure  TMassiveLine.SetChanges(Index : Integer;
+                                   Item  : String);
+Begin
+ If (Index < vChanges.Count) And (Index > -1) Then
+  vChanges[Index] := Item;
+End;
+
 Function TMassiveLine.GetRecPK(Index : Integer) : TMassiveValue;
 Begin
  Result := Nil;
  If vPrimaryValues <> Nil Then
   If (Index < vPrimaryValues.Count) And (Index > -1) Then
    Result := TMassiveValue(TList(vPrimaryValues).Items[Index]^);
+End;
+
+Function  TMassiveLine.UpdateFieldChangesCount : Integer;
+Begin
+ Result := 0;
+ If vChanges <> Nil Then
+  Result := vChanges.Count;
 End;
 
 Procedure TMassiveLine.ClearAll;
@@ -1107,7 +1178,7 @@ Begin
    Begin
     BufferStream.InputBytes(VarToBytes(Changes.Count > 0, varBoolean));
     If Changes.Count > 0 Then
-     BufferStream.InputBytes(VarToBytes(EncodeStrings(Changes.Text{$IFDEF FPC}, TDatabaseCharSet.csUTF8{$ENDIF}), varString));
+     BufferStream.InputBytes(VarToBytes(EncodeStrings(Changes.Text{$IFDEF RESTDWLAZARUS}, TDatabaseCharSet.csUndefined{$ENDIF}), varString));
     If vPrimaryValues = Nil Then
      BufferStream.InputBytes(VarToBytes(False, varBoolean))
     Else
@@ -1130,6 +1201,7 @@ Begin
        End;
      End;
     BufferStream.InputBytes(VarToBytes(vMassiveValues.Count, varInteger));
+    If assigned(MassiveBuffer) then
     For I := 1 To vMassiveValues.Count - 1 Do
      Begin
       If MassiveMode = mmUpdate Then
@@ -1139,29 +1211,33 @@ Begin
         vNoChange := True;
         For A := 0 To Changes.Count -1 Do
          Begin
-          If TMassiveDatasetBuffer(MassiveBuffer).Dataset <> Nil Then
+          If assigned(MassiveBuffer) then
            Begin
-            If TMassiveDatasetBuffer(MassiveBuffer).vMassiveFields.Count <= (I-1) Then
-             Continue;
-            If (TMassiveDatasetBuffer(MassiveBuffer).Dataset.FindField(TMassiveDatasetBuffer(MassiveBuffer).vMassiveFields.Items[I-1].vFieldName) <> Nil) Then
+            If TMassiveDatasetBuffer(MassiveBuffer).Dataset <> Nil Then
              Begin
-              If TMassiveDatasetBuffer(MassiveBuffer).Dataset.FieldByName(TMassiveDatasetBuffer(MassiveBuffer).vMassiveFields.Items[I-1].vFieldName).ReadOnly Then
+              If TMassiveDatasetBuffer(MassiveBuffer).vMassiveFields.Count <= (I-1) Then
                Continue;
+              If (TMassiveDatasetBuffer(MassiveBuffer).Dataset.FindField(TMassiveDatasetBuffer(MassiveBuffer).vMassiveFields.Items[I-1].vFieldName) <> Nil) Then
+               Begin
+                If TMassiveDatasetBuffer(MassiveBuffer).Dataset.FieldByName(TMassiveDatasetBuffer(MassiveBuffer).vMassiveFields.Items[I-1].vFieldName).ReadOnly Then
+                 Continue;
+               End
+              Else
+               vNoChange := Not TMassiveDatasetBuffer(MassiveBuffer).vReflectChanges;
+              If Not((TMassiveDatasetBuffer(MassiveBuffer).Dataset.FindField(TMassiveDatasetBuffer(MassiveBuffer).vMassiveFields.Items[I-1].vFieldName) = Nil)) Then
+               vNoChange := Lowercase(TMassiveDatasetBuffer(MassiveBuffer).vMassiveFields.Items[I-1].vFieldName) <> Lowercase(Changes[A]);
              End
             Else
-             vNoChange := Not TMassiveDatasetBuffer(MassiveBuffer).vReflectChanges;
-            If Not((TMassiveDatasetBuffer(MassiveBuffer).Dataset.FindField(TMassiveDatasetBuffer(MassiveBuffer).vMassiveFields.Items[I-1].vFieldName) = Nil)) Then
              vNoChange := Lowercase(TMassiveDatasetBuffer(MassiveBuffer).vMassiveFields.Items[I-1].vFieldName) <> Lowercase(Changes[A]);
-           End
-          Else
-           vNoChange := Lowercase(TMassiveDatasetBuffer(MassiveBuffer).vMassiveFields.Items[I-1].vFieldName) <> Lowercase(Changes[A]);
+           End;
+
           If Not (vNoChange) Then
            Break;
          End;
         If vNoChange Then
          Continue;
        End;
-      If TMassiveDatasetBuffer(MassiveBuffer).Dataset <> Nil Then
+     If TMassiveDatasetBuffer(MassiveBuffer).Dataset <> Nil Then
        Begin
         If TMassiveDatasetBuffer(MassiveBuffer).vMassiveFields.Count <= (I-1) then
          Continue;
@@ -1212,7 +1288,7 @@ Procedure TMassiveBuffer.Delete(Index: Integer);
 Begin
  If (Index < Self.Count) And (Index > -1) Then
   Begin
-   {$IFDEF FPC}
+   {$IFDEF RESTDWLAZARUS}
    If (Index <= Self.Count -1) Then
    {$ENDIF}
    If Assigned(TList(Self).Items[Index]) Then
@@ -1220,10 +1296,14 @@ Begin
      Try
       If Assigned(TMassiveLine(TList(Self).Items[Index]^)) Then
        FreeAndNil(PMassiveLine(TList(Self).Items[Index])^);
-      {$IFDEF FPC}
+      {$IFDEF RESTDWLAZARUS}
        Dispose(PMassiveLine(TList(Self).Items[Index]));
       {$ELSE}
-       Dispose(TList(Self).Items[Index]);
+       {$IFDEF FPC}
+        Dispose(PMassiveLine(TList(Self).Items[Index]));
+       {$ELSE}
+        Dispose(TList(Self).Items[Index]);
+       {$ENDIF}
       {$ENDIF}
      Except
      End;
@@ -1251,22 +1331,6 @@ Begin
   TMassiveLine(TList(Self).Items[Index]^) := Item;
 End;
 
-Procedure TMassiveBuffer.LoadFromStream(Source     : TStream);
-Var
- BufferStream,
- BufferBase : TRESTDWBufferBase; //Pacote de Entrada
-Begin
-
-End;
-
-Procedure TMassiveBuffer.SaveToStream  (Const Dest : TStream);
-Var
- BufferStream,
- BufferBase : TRESTDWBufferBase; //Pacote de Saida
-Begin
-
-End;
-
 { TMassiveDatasetBuffer }
 
 Procedure TMassiveDatasetBuffer.NewLineBuffer(Var MassiveLineBuff : TMassiveLine;
@@ -1291,18 +1355,21 @@ Begin
     Begin
      MassiveValue          := TMassiveValue.Create;
      MassiveValue.Encoding := vEncoding;
-     If (vMassiveFields.Count > I) And (I > 0) Then
+     If (I > 0) Then
       Begin
        MassiveValue.ValueName              := vMassiveFields.Items[I -1].FieldName;
        MassiveValue.ObjectValue            := vMassiveFields.Items[I -1].vFieldType;
        MassiveValue.vJSONValue.ObjectValue := MassiveValue.ObjectValue;
       End;
-     {$IFDEF FPC}
+     {$IFDEF RESTDWLAZARUS}
      MassiveValue.DatabaseCharSet := DatabaseCharSet;
      {$ENDIF}
      If I = 0 Then
       MassiveValue.Value := MassiveModeToString(MassiveModeData);
-     MassiveLineBuff.vMassiveValues.Add(MassiveValue);
+     If ((MassiveValue.ValueName <> '') Or (I = 0)) Then
+      MassiveLineBuff.vMassiveValues.Add(MassiveValue)
+     Else
+      FreeAndNil(MassiveValue);
     End;
   End;
 End;
@@ -1317,6 +1384,7 @@ Procedure TMassiveDatasetBuffer.BuildLine(Dataset             : TRESTDWClientSQL
   I, A          : Integer;
   vFieldList    : TStringList;
   Field         : TField;
+  vStringStreamB,
   vStringStream : TMemoryStream;
   vUpdateCase   : Boolean;
   MassiveValue  : TMassiveValue;
@@ -1360,9 +1428,17 @@ Procedure TMassiveDatasetBuffer.BuildLine(Dataset             : TRESTDWClientSQL
       Field := Dataset.FindField(vFieldList[I]);
       If Field <> Nil Then
        Begin
-        If (Field.ProviderFlags = []) Then //Or (Field.ReadOnly) Then
+        If (Field.ProviderFlags = []) Then
          Continue;
-        MassiveLineBuff.vMassiveValues.Items[I + 1].vJSONValue.ObjectValue := FieldTypeToObjectValue(Field.DataType);
+        If MassiveLineBuff.vMassiveValues.Count > (I + 1) Then
+         Begin
+          If MassiveLineBuff.vMassiveValues.Items[I + 1] <> Nil Then
+           MassiveLineBuff.vMassiveValues.Items[I + 1].vJSONValue.ObjectValue := FieldTypeToObjectValue(Field.DataType)
+          Else
+           Continue;
+         End
+        Else
+         Continue;
         If MassiveModeBuff = mmDelete Then
          If Not(pfInKey in Field.ProviderFlags) Then
           Continue;
@@ -1407,170 +1483,164 @@ Procedure TMassiveDatasetBuffer.BuildLine(Dataset             : TRESTDWClientSQL
             End;
           End;
         Case Field.DataType Of
-         {$IFNDEF FPC}{$if CompilerVersion > 21} // Delphi 2010 pra baixo
-         ftFixedChar, ftFixedWideChar,
-         {$IFEND}{$ENDIF}
-         ftString,    ftWideString,
-         ftMemo {$IFNDEF FPC}
-         {$IF CompilerVersion > 21}
-         , ftWideMemo
-         {$IFEND}
-         {$ELSE}
-         , ftWideMemo
-         {$ENDIF}                  : Begin
-                                      If Not UpdateTag Then
-                                       Begin
-                                        If Field.IsNull Then
-                                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null
-                                        Else If Field.Size > 0 Then
-                                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Copy(Field.AsString, 1, Field.Size)
-                                        Else
-                                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Field.AsString;
-                                       End
-                                      Else
-                                       Begin
-                                        If (MassiveLineBuff.vMassiveValues.Items[I + 1].Value <> Field.Value)   Then
-                                         Begin
-                                          MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Field.Value;
-                                          MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName));
-                                         End;
-                                       End;
-                                     End;
-         ftInteger, ftSmallInt,
-         ftWord,    ftLargeint
-         {$IFNDEF FPC}{$if CompilerVersion > 21}, ftLongWord{$IFEND}{$ENDIF}
-                                   : Begin
-                                      If Not UpdateTag Then
-                                       Begin
-                                        If Field.IsNull Then
-                                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null
-                                        Else If Trim(Field.AsString) <> '' Then
-                                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Trim(Field.AsString)
-                                        Else
-                                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := '';
-                                       End
-                                      Else
-                                       Begin
-                                        If Field.IsNull Then
-                                         Begin
-                                          MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null;
-                                          MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName)); // ELOY - Add to BufferChanges
-                                         End
-                                        Else
-                                         Begin
-                                          If ((MassiveLineBuff.vMassiveValues.Items[I + 1].Value <> Field.Value)    Or
-                                              (MassiveLineBuff.vMassiveValues.Items[I + 1].isnull <> Field.IsNull)) Then
-                                           Begin
-                                            MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Trim(Field.AsString);
-                                            MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName));
-                                           End;
-                                         End;
-                                       End;
-                                     End;
-         ftFloat,
-         ftCurrency, ftBCD{$IFNDEF FPC}
-                          {$IF CompilerVersion > 21}
-                           , ftSingle, ftFMTBcd
-                          {$IFEND}
-                          {$ENDIF} : Begin
-                                      If Not UpdateTag Then
-                                       Begin
-                                        If Field.IsNull Then
-                                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null
-                                        Else If Trim(Field.AsString) <> '' Then
-                                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := BuildStringFloat(Field.AsString)
-                                        Else
-                                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := '';
-                                       End
-                                      Else
-                                       Begin
-                                        If Field.IsNull Then
-                                         Begin
-                                          MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null;
-                                          MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName)); // ELOY - Add to BufferChanges
-                                         End
-                                        Else
-                                         Begin
-                                          If ((MassiveLineBuff.vMassiveValues.Items[I + 1].Value <> Field.Value)    Or
-                                              (MassiveLineBuff.vMassiveValues.Items[I + 1].isnull <> Field.IsNull)) Then
-                                           Begin
-                                            If Trim(Field.AsString) <> '' Then
-                                             MassiveLineBuff.vMassiveValues.Items[I + 1].Value := BuildStringFloat(Field.AsString)
-                                            Else
-                                             MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null;
-                                            MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName));
-                                           End;
-                                         End;
-                                       End;
-                                     End;
-         ftDate, ftTime,
-         ftDateTime, ftTimeStamp   : Begin
-                                      If Not UpdateTag Then
-                                       Begin
-                                        If Field.IsNull Then
-                                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null
-                                        Else If Trim(Field.AsString) <> '' Then
-                                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Field.AsDateTime
-                                        Else
-                                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := '';
-                                       End
-                                      Else
-                                       Begin
-                                        If Field.IsNull Then
-                                         Begin
-                                          If Not MassiveLineBuff.vMassiveValues.Items[I + 1].IsNull  then
-                                           Begin
-                                            MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null;
-                                            MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName)); // ELOY - Add to BufferChanges
-                                           End
-                                          Else
-                                           MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null;
-                                         End
-                                        Else
-                                         Begin
-                                          If  ((MassiveLineBuff.vMassiveValues.Items[I + 1].Value <> Field.Value)   Or
-                                              (MassiveLineBuff.vMassiveValues.Items[I + 1].isnull <> Field.IsNull)) Then
-                                           Begin
-                                            If Trim(Field.AsString) <> '' Then
-                                             MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Field.AsDateTime
-                                            Else
-                                             MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null;
-                                            MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName));
-                                           End;
-                                         End;
-                                       End;
-                                     End;
-         ftBytes, ftVarBytes,
-         ftBlob, ftGraphic,
-         ftOraBlob, ftOraClob      : Begin
-                                      vStringStream := TMemoryStream.Create;
-                                      Try
-                                       If Not Field.IsNull Then
-                                        Begin
-                                         MassiveLineBuff.vMassiveValues.Items[I + 1].Binary := True;
-                                         TBlobField(Field).SaveToStream(vStringStream);
-                                         vStringStream.Position := 0;
-                                         If Not UpdateTag Then
-                                          MassiveLineBuff.vMassiveValues.Items[I + 1].Value := EncodeStream(vStringStream) //StreamToHex(vStringStream)
-                                         Else
-                                          Begin
-                                           If MassiveLineBuff.vMassiveValues.Items[I + 1].Value <> EncodeStream(vStringStream) Then //StreamToHex(vStringStream) Then
-                                            Begin
-                                             MassiveLineBuff.vMassiveValues.Items[I + 1].Value := EncodeStream(vStringStream); //StreamToHex(vStringStream);
-                                             MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName));
-                                            End;
-                                          End;
-                                        End
-                                       Else
-                                        Begin
-                                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null;
-                                         MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName));
-                                        End;
-                                      Finally
-                                       If Assigned(vStringStream) Then
-                                        FreeAndNil(vStringStream);
-                                      End;
-                                     End;
+         {$IFDEF DELPHIXEUP}ftFixedChar, ftFixedWideChar,{$ENDIF}
+         {$IF Defined(RESTDWLAZARUS) OR Defined(DELPHIXEUP)}ftWideMemo,{$IFEND}
+         ftString, ftWideString,
+         ftMemo: Begin
+                  If Not UpdateTag Then
+                   Begin
+                    If Field.IsNull Then
+                     MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null
+                    Else If Field.Size > 0 Then
+                     MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Copy(Field.AsString, 1, Field.Size)
+                    Else
+                     MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Field.AsString;
+                   End
+                  Else
+                   Begin
+                    If (MassiveLineBuff.vMassiveValues.Items[I + 1].Value <> Field.Value)   Then
+                     Begin
+                      MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Field.Value;
+                      MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName));
+                     End;
+                   End;
+                 End;
+         {$IFDEF DELPHIXEUP}ftLongWord,{$ENDIF}
+         ftInteger, ftSmallInt, ftWord,
+         ftLargeint: Begin
+                      If Not UpdateTag Then
+                       Begin
+                        If Field.IsNull Then
+                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null
+                        Else If Trim(Field.AsString) <> '' Then
+                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Trim(Field.AsString)
+                        Else
+                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := '';
+                       End
+                      Else
+                       Begin
+                        If Field.IsNull Then
+                         Begin
+                          MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null;
+                          MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName)); // ELOY - Add to BufferChanges
+                         End
+                        Else
+                         Begin
+                          If ((MassiveLineBuff.vMassiveValues.Items[I + 1].Value <> Field.Value)    Or
+                              (MassiveLineBuff.vMassiveValues.Items[I + 1].isnull <> Field.IsNull)) Then
+                           Begin
+                            MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Trim(Field.AsString);
+                            MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName));
+                           End;
+                         End;
+                       End;
+                     End;
+        {$IFDEF DELPHIXEUP}ftSingle, ftFMTBcd,{$ENDIF}
+         ftFloat, ftCurrency,
+         ftBCD : Begin
+                  If Not UpdateTag Then
+                   Begin
+                    If Field.IsNull Then
+                     MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null
+                    Else If Trim(Field.AsString) <> '' Then
+                     MassiveLineBuff.vMassiveValues.Items[I + 1].Value := BuildStringFloat(Field.AsString)
+                    Else
+                     MassiveLineBuff.vMassiveValues.Items[I + 1].Value := '';
+                   End
+                  Else
+                   Begin
+                    If Field.IsNull Then
+                     Begin
+                      MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null;
+                      MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName)); // ELOY - Add to BufferChanges
+                     End
+                    Else
+                     Begin
+                      If ((MassiveLineBuff.vMassiveValues.Items[I + 1].Value <> Field.Value)    Or
+                          (MassiveLineBuff.vMassiveValues.Items[I + 1].isnull <> Field.IsNull)) Then
+                       Begin
+                        If Trim(Field.AsString) <> '' Then
+                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := BuildStringFloat(Field.AsString)
+                        Else
+                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null;
+                        MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName));
+                       End;
+                     End;
+                   End;
+                 End;
+         ftDate, ftTime, ftDateTime,
+         ftTimeStamp: Begin
+                        If Not UpdateTag Then
+                         Begin
+                          If Field.IsNull Then
+                           MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null
+                          Else If Trim(Field.AsString) <> '' Then
+                           MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Field.Value
+                          Else
+                           MassiveLineBuff.vMassiveValues.Items[I + 1].Value := '';
+                         End
+                        Else
+                         Begin
+                          If Field.IsNull Then
+                           Begin
+                            If Not MassiveLineBuff.vMassiveValues.Items[I + 1].IsNull  then
+                             Begin
+                              MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null;
+                              MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName)); // ELOY - Add to BufferChanges
+                             End
+                            Else
+                             MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null;
+                           End
+                          Else
+                           Begin
+                            If  ((MassiveLineBuff.vMassiveValues.Items[I + 1].Value <> Field.AsDateTime)   Or
+                                (MassiveLineBuff.vMassiveValues.Items[I + 1].isnull <> Field.IsNull)) Then
+                             Begin
+                              If Trim(Field.AsString) <> '' Then
+                               MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Field.AsDateTime
+                              Else
+                               MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null;
+                              MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName));
+                             End;
+                           End;
+                         End;
+                      End;
+         ftBytes, ftVarBytes, ftBlob, ftGraphic, ftOraBlob,
+         ftOraClob: Begin
+                      vStringStream := TMemoryStream.Create;
+                      Try
+                       If Not Field.IsNull Then
+                        Begin
+                         MassiveLineBuff.vMassiveValues.Items[I + 1].Binary := True;
+                         TBlobField(Field).SaveToStream(vStringStream);
+                         vStringStream.Position := 0;
+                         If Not UpdateTag Then
+                          MassiveLineBuff.vMassiveValues.Items[I + 1].LoadFromStream(vStringStream) //StreamToHex(vStringStream)
+                         Else
+                          Begin
+                           vStringStreamB := TMemoryStream.Create;
+                           MassiveLineBuff.vMassiveValues.Items[I + 1].SaveToStream(vStringStreamB);
+                           Try
+                            If EncodeStream(vStringStreamB) <> EncodeStream(vStringStream) Then //StreamToHex(vStringStream) Then
+                             Begin
+                              MassiveLineBuff.vMassiveValues.Items[I + 1].LoadFromStream(vStringStream); //StreamToHex(vStringStream);
+                              MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName));
+                             End;
+                           Finally
+                            FreeAndNil(vStringStreamB);
+                           End;
+                          End;
+                        End
+                       Else
+                        Begin
+                         MassiveLineBuff.vMassiveValues.Items[I + 1].Value := Null;
+                         MassiveLineBuff.vChanges.Add(Uppercase(Field.FieldName));
+                        End;
+                      Finally
+                       If Assigned(vStringStream) Then
+                        FreeAndNil(vStringStream);
+                      End;
+                    End;
          Else
           Begin
            If Not UpdateTag Then
@@ -1600,8 +1670,8 @@ Procedure TMassiveDatasetBuffer.BuildLine(Dataset             : TRESTDWClientSQL
           vBookmark := BookmarkToHex(TRESTDWBytes(TRESTDWClientSQL(Dataset).Bookmark));
          Except
          End;
-         vTagkey := IntToStr(vLastOpen) + '|' + EncodeStrings(vBookmark{$IFDEF FPC}, csUndefined{$ENDIF});
-         MassiveLineBuff.vMassiveValues.Items[MassiveLineBuff.vMassiveValues.Count -1].Value := EncodeStrings(vTagKey{$IFDEF FPC}, csUndefined{$ENDIF});
+         vTagkey := IntToStr(vLastOpen) + '|' + EncodeStrings(vBookmark{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
+         TMassiveValue(MassiveLineBuff.vMassiveValues.Items[MassiveLineBuff.vMassiveValues.Count -1]).Value := EncodeStrings(vTagKey{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
         End;
       End
      Else If Dataset is TRESTDWTable Then
@@ -1612,8 +1682,8 @@ Procedure TMassiveDatasetBuffer.BuildLine(Dataset             : TRESTDWClientSQL
           vBookmark := BookmarkToHex(TRESTDWBytes(TRESTDWTable(Dataset).Bookmark));
          Except
          End;
-         vTagkey := IntToStr(vLastOpen) + '|' + EncodeStrings(vBookmark{$IFDEF FPC}, csUndefined{$ENDIF});
-         MassiveLineBuff.vMassiveValues.Items[MassiveLineBuff.vMassiveValues.Count -1].Value := EncodeStrings(vTagKey{$IFDEF FPC}, csUndefined{$ENDIF});
+         vTagkey := IntToStr(vLastOpen) + '|' + EncodeStrings(vBookmark{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
+         TMassiveValue(MassiveLineBuff.vMassiveValues.Items[MassiveLineBuff.vMassiveValues.Count -1]).Value := EncodeStrings(vTagKey{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
         End;
       End;
     End;
@@ -1661,84 +1731,84 @@ Begin
   End;
  vSequenceName     := Dataset.SequenceName;
  vSequenceField    := Dataset.SequenceField;
- For I := 0 To Dataset.Fields.Count -1 Do
+// If vMassiveFields.Count = 0 Then
   Begin
-   If ((Dataset.Fields[I].FieldKind = fkData)             And
-       ((pfInUpdate in Dataset.Fields[I].ProviderFlags)   Or
-        (pfInWhere  in Dataset.Fields[I].ProviderFlags)   Or
-        (pfInKey    in Dataset.Fields[I].ProviderFlags))) Or
-      (vReflectChanges And ((Dataset.Fields[I].ReadOnly)  Or
-       (Not(Dataset.Fields[I].ProviderFlags = []))))      Then
+   For I := 0 To Dataset.Fields.Count -1 Do
     Begin
-     MassiveField                    := vMassiveFields.FieldByName(Dataset.Fields[I].FieldName);
-     If MassiveField = Nil Then
+     If ((Dataset.Fields[I].FieldKind = fkData)             And
+         ((pfInUpdate in Dataset.Fields[I].ProviderFlags)   Or
+          (pfInWhere  in Dataset.Fields[I].ProviderFlags)   Or
+          (pfInKey    in Dataset.Fields[I].ProviderFlags))) Or
+          (vReflectChanges And ((Dataset.Fields[I].ReadOnly)  Or
+         (Not(Dataset.Fields[I].ProviderFlags = []))))      Then
       Begin
-       MassiveField                   := TMassiveField.Create(vMassiveFields, vMassiveFields.Count);
-       vMassiveFields.Add(MassiveField);
-      End;
-     MassiveField.vReadOnly          := Dataset.Fields[I].ReadOnly;
-     MassiveField.vRequired          := Dataset.Fields[I].Required;
-     MassiveField.vKeyField          := pfInKey in Dataset.Fields[I].ProviderFlags;
-     MassiveField.vFieldName         := Dataset.Fields[I].FieldName;
-     MassiveField.vFieldType         := FieldTypeToObjectValue(Dataset.Fields[I].DataType);
-     MassiveField.vSize              := Dataset.Fields[I].DataSize;
-     {$IFNDEF FPC}{$IF CompilerVersion > 21}
-     MassiveField.vAutoGenerateValue := ((Dataset.Fields[I].AutoGenerateValue = arAutoInc) Or
-                                         (Lowercase(Dataset.Fields[I].FieldName) = Lowercase(vSequenceField)));
-     If Not (MassiveField.vAutoGenerateValue) Then
-      MassiveField.vAutoGenerateValue := ((Dataset.Fields[I].FieldKind = fkInternalCalc) Or
-                                          (Lowercase(Dataset.Fields[I].FieldName) = Lowercase(vSequenceField)));
-     {$ELSE}
-     MassiveField.vAutoGenerateValue := ((Dataset.Fields[I].FieldKind = fkInternalCalc) Or
-                                         (Lowercase(Dataset.Fields[I].FieldName) = Lowercase(vSequenceField)));
-     {$IFEND}
-     {$ELSE}
-     MassiveField.vAutoGenerateValue := ((Dataset.Fields[I].FieldKind = fkInternalCalc) Or
-                                         (Lowercase(Dataset.Fields[I].FieldName) = Lowercase(vSequenceField)));
-     {$ENDIF}
-    End
-   Else
-    Begin
-     If (Not(vReflectChanges) And
-        ((Dataset.Fields[I].ReadOnly) Or (Dataset.Fields[I].ProviderFlags = []))) Or
-        (vReflectChanges And (Dataset.Fields[I].ProviderFlags = [])) Then
-      Begin
-       If vMassiveFields.FieldByName(Dataset.Fields[I].FieldName) <> Nil Then
+       MassiveField                    := vMassiveFields.FieldByName(Dataset.Fields[I].FieldName);
+       If MassiveField = Nil Then
         Begin
-         If Dataset is TRESTDWClientSQL Then
-          TRESTDWClientSQL(Dataset).RebuildMassiveDataset
-         Else If Dataset is TRESTDWTable Then
-          TRESTDWTable(Dataset).RebuildMassiveDataset;
-         Exit;
-         //vMassiveFields.Delete(Dataset.Fields[I].FieldName);
+         MassiveField                   := TMassiveField.Create(vMassiveFields, vMassiveFields.Count);
+         vMassiveFields.Add(MassiveField);
+        End;
+       MassiveField.vReadOnly          := Dataset.Fields[I].ReadOnly;
+       MassiveField.vRequired          := Dataset.Fields[I].Required;
+       MassiveField.vKeyField          := pfInKey in Dataset.Fields[I].ProviderFlags;
+       MassiveField.vFieldName         := Dataset.Fields[I].FieldName;
+       MassiveField.vFieldType         := FieldTypeToObjectValue(Dataset.Fields[I].DataType);
+       MassiveField.vSize              := Dataset.Fields[I].DataSize;
+       {$IFDEF DELPHIXEUP}
+        MassiveField.vAutoGenerateValue := ((Dataset.Fields[I].AutoGenerateValue = arAutoInc) Or
+                                            (Lowercase(Dataset.Fields[I].FieldName) = Lowercase(vSequenceField)));
+        If Not (MassiveField.vAutoGenerateValue) Then
+         MassiveField.vAutoGenerateValue := ((Dataset.Fields[I].FieldKind = fkInternalCalc) Or
+                                             (Lowercase(Dataset.Fields[I].FieldName) = Lowercase(vSequenceField)));
+       {$ELSE}
+        MassiveField.vAutoGenerateValue := ((Dataset.Fields[I].FieldKind = fkInternalCalc) Or
+                                            (Lowercase(Dataset.Fields[I].FieldName) = Lowercase(vSequenceField)));
+       {$ENDIF}
+      End
+     Else
+      Begin
+       If (Not(vReflectChanges)                         And
+          ((Dataset.Fields[I].ReadOnly)                 Or
+           (Dataset.Fields[I].ProviderFlags = [])))     Or
+          (vReflectChanges And (Dataset.Fields[I].ProviderFlags = [])) Then
+        Begin
+         If vMassiveFields.FieldByName(Dataset.Fields[I].FieldName) <> Nil Then
+          Begin
+           If Dataset is TRESTDWClientSQL Then
+            TRESTDWClientSQL(Dataset).RebuildMassiveDataset
+           Else If Dataset is TRESTDWTable Then
+            TRESTDWTable(Dataset).RebuildMassiveDataset;
+           Exit;
+           //vMassiveFields.Delete(Dataset.Fields[I].FieldName);
+          End;
         End;
       End;
     End;
-  End;
- If vReflectChanges Then
-  Begin
-   If vMassiveFields.Count > 0 Then
+   If vReflectChanges Then
     Begin
-     vMassiveLine.vMassiveMode       := mmBrowse;
-     MassiveField                    := vMassiveFields.FieldByName(RESTDWFieldBookmark);
-     If MassiveField = Nil Then
+     If vMassiveFields.Count > 0 Then
       Begin
-       MassiveField                  := TMassiveField.Create(vMassiveFields, vMassiveFields.Count);
-       vMassiveFields.Add(MassiveField);
+       vMassiveLine.vMassiveMode       := mmBrowse;
+       MassiveField                    := vMassiveFields.FieldByName(RESTDWFieldBookmark);
+       If MassiveField = Nil Then
+        Begin
+         MassiveField                  := TMassiveField.Create(vMassiveFields, vMassiveFields.Count);
+         vMassiveFields.Add(MassiveField);
+        End;
+       MassiveField.vRequired          := False;
+       MassiveField.vKeyField          := False;
+       MassiveField.vFieldName         := RESTDWFieldBookmark;
+       MassiveField.vFieldType         := ovString;
+       MassiveField.vSize              := 60;
+       MassiveField.vAutoGenerateValue := True;
       End;
-     MassiveField.vRequired          := False;
-     MassiveField.vKeyField          := False;
-     MassiveField.vFieldName         := RESTDWFieldBookmark;
-     MassiveField.vFieldType         := ovString;
-     MassiveField.vSize              := 60;
-     MassiveField.vAutoGenerateValue := True;
     End;
+   If Dataset      Is TRESTDWClientSQL Then
+    vTableName    := TRESTDWClientSQL(Dataset).UpdateTableName
+   Else If Dataset Is TRESTDWTable Then
+    vTableName    := TRESTDWTable(Dataset).TableName;
+   vSequenceName  := Dataset.SequenceName;
   End;
- If Dataset      Is TRESTDWClientSQL Then
-  vTableName    := TRESTDWClientSQL(Dataset).UpdateTableName
- Else If Dataset Is TRESTDWTable Then
-  vTableName    := TRESTDWTable(Dataset).TableName;
- vSequenceName  := Dataset.SequenceName;
 End;
 
 Procedure TMassiveDatasetBuffer.BuildBuffer(Dataset     : TRESTDWClientSQLBase;
@@ -1838,16 +1908,12 @@ Begin
      MassiveField.vFieldName         := Dataset.Fields[I].FieldName;
      MassiveField.vFieldType         := FieldTypeToObjectValue(Dataset.Fields[I].DataType);
      MassiveField.vSize              := Dataset.Fields[I].DataSize;
-     {$IFNDEF FPC}{$IF CompilerVersion > 21}
+     {$IFDEF DELPHIXEUP}
      MassiveField.vAutoGenerateValue := ((Dataset.Fields[I].AutoGenerateValue = arAutoInc) Or
                                          (Lowercase(Dataset.Fields[I].FieldName) = Lowercase(vSequenceField)));
      If Not (MassiveField.vAutoGenerateValue) Then
       MassiveField.vAutoGenerateValue := ((Dataset.Fields[I].FieldKind = fkInternalCalc) Or
                                           (Lowercase(Dataset.Fields[I].FieldName) = Lowercase(vSequenceField)));
-     {$ELSE}
-     MassiveField.vAutoGenerateValue := ((Dataset.Fields[I].FieldKind = fkInternalCalc) Or
-                                         (Lowercase(Dataset.Fields[I].FieldName) = Lowercase(vSequenceField)));
-     {$IFEND}
      {$ELSE}
      MassiveField.vAutoGenerateValue := ((Dataset.Fields[I].FieldKind = fkInternalCalc) Or
                                          (Lowercase(Dataset.Fields[I].FieldName) = Lowercase(vSequenceField)));
@@ -2161,9 +2227,11 @@ Begin
          Begin
           If vReflectChanges Then
            Begin
-            If (vMassiveLine.vMassiveValues.Items[I +1].Value <> '')               And
-               (Lowercase(vMassiveFields.Items[I].vFieldName) = Lowercase(RESTDWFieldBookmark)) Then
-             MassiveLine.vMassiveValues.Items[I +1].Value := vMassiveLine.vMassiveValues.Items[I +1].Value;
+            If vMassiveLine.vMassiveValues.Items[I +1] <> Nil Then
+//             If vMassiveLine.vMassiveValues.Items[I +1].vValueName <> '' Then
+             If (vMassiveLine.vMassiveValues.Items[I +1].Value <> '')               And
+                (Lowercase(vMassiveFields.Items[I].vFieldName) = Lowercase(RESTDWFieldBookmark)) Then
+              MassiveLine.vMassiveValues.Items[I +1].Value := vMassiveLine.vMassiveValues.Items[I +1].Value;
            End;
          End;
        End;
@@ -2191,10 +2259,10 @@ Begin
            MassiveLine.vPrimaryValues := TMassiveValues.Create;
           For A := 0 To vMassiveLine.vPrimaryValues.Count -1 do
            Begin
-            MassiveValue  := TMassiveValue.Create;
+            MassiveValue             := TMassiveValue.Create;
             MassiveValue.ObjectValue := vMassiveLine.vPrimaryValues.Items[A].ObjectValue;
             MassiveValue.ValueName   := vMassiveLine.vPrimaryValues.Items[A].ValueName;
-            MassiveValue.Value       := vMassiveLine.vPrimaryValues.Items[A].Value;
+            MassiveValue.CopyValue(vMassiveLine.vPrimaryValues.Items[A]);
             MassiveLine.vPrimaryValues.Add(MassiveValue);
            End;
          End;
@@ -2305,7 +2373,7 @@ Var
     FreeAndNil(aBodyStream);
     vMassiveMode := mmInactive;
     Try
-     If Not BufferBody.Eof Then
+     While Not BufferBody.Eof Do
       Begin
        aStream      := BufferBody.ReadStream;
        MassiveLine  := TMassiveLine.Create;
@@ -2331,7 +2399,7 @@ Var
          End;
         aBool := BytesToVar(BufferStream.ReadBytes, varBoolean);
         If aBool Then
-         MassiveLine.vChanges.Text := DecodeStrings(BytesToVar(BufferStream.ReadBytes, varString){$IFDEF FPC}, TDatabaseCharSet.csUTF8{$ENDIF});
+         MassiveLine.vChanges.Text := DecodeStrings(BytesToVar(BufferStream.ReadBytes, varString){$IFDEF RESTDWLAZARUS}, TDatabaseCharSet.csUndefined{$ENDIF});
         aBool := BytesToVar(BufferStream.ReadBytes, varBoolean);
         If aBool Then
          Begin
@@ -2347,7 +2415,7 @@ Var
                                               ovWideMemo, ovFixedChar, ovFixedWideChar] Then
                MassiveValue.Value := vTempValue
               Else If MassiveValue.vJSONValue.ObjectValue in [ovDate, ovTime, ovDateTime, ovTimeStamp] then     // ajuste massive
-               MassiveValue.Value := UnixToDateTime(StrToInt64(vTempValue))
+               MassiveValue.Value := vTempValue //UnixToDateTime(StrToInt64(vTempValue))
               Else
                MassiveValue.Value := vTempValue;
              End;
@@ -2442,7 +2510,7 @@ Begin
     aTagLinkFields     := BytesToVar(BufferBase.ReadBytes, varString);
     If Trim(aTagLinkFields) <> '' Then
      Begin
-      vMasterCompFields := DecodeStrings(aTagLinkFields{$IFDEF FPC}, csUndefined{$ENDIF});
+      vMasterCompFields := DecodeStrings(aTagLinkFields{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
       BuildCompFields(vMasterCompFields);
      End;
     //Carregando Body
@@ -2491,7 +2559,7 @@ Var
            (vDataset.FieldByName(vMassiveFields.Items[I].vFieldName).ReadOnly) And
            ((Not vMassiveFields.Items[I].vKeyField) And (Not vMassiveFields.Items[I].vAutoGenerateValue)) Then
          Continue;
-        {$IFNDEF FPC}{$IF CompilerVersion > 21}
+        {$IFDEF DELPHIXEUP}
         vMassiveFields.Items[I].vReadOnly          := vDataset.FieldByName(vMassiveFields.Items[I].vFieldName).ReadOnly;
         vMassiveFields.Items[I].vAutoGenerateValue := ((vDataset.FieldByName(vMassiveFields.Items[I].vFieldName).AutoGenerateValue = arAutoInc) Or
                                                        (lowercase(vMassiveFields.Items[I].vFieldName) = lowercase(vSequenceField)));
@@ -2501,10 +2569,6 @@ Var
         {$ELSE}
         vMassiveFields.Items[I].vAutoGenerateValue := ((vDataset.FieldByName(vMassiveFields.Items[I].vFieldName).FieldKind = fkInternalCalc) Or
                                                         (lowercase(vMassiveFields.Items[I].vFieldName) = lowercase(vSequenceField)));
-        {$IFEND}
-        {$ELSE}
-        vMassiveFields.Items[I].vAutoGenerateValue := ((vDataset.FieldByName(vMassiveFields.Items[I].vFieldName).FieldKind = fkInternalCalc) Or
-                                                       (lowercase(vMassiveFields.Items[I].vFieldName) = lowercase(vSequenceField)));
         {$ENDIF}
        End;
      End;
@@ -2522,8 +2586,10 @@ Var
        (vMassiveFields.Items[I].FieldType = ovAutoInc) Then
      vAutoinc := 'S';
     vPrecision := 0;
-    If vMassiveFields.Items[I].FieldType In [{$IFNDEF FPC}{$IF CompilerVersion > 21}ovExtended,
-                                             {$IFEND}{$ENDIF}ovFloat, ovCurrency, ovFMTBcd, ovSingle, ovBCD] Then
+    If vMassiveFields.Items[I].FieldType In [{$IFDEF DELPHIXEUP}
+                                             ovExtended,{$ENDIF}
+                                             ovFloat, ovCurrency, ovFMTBcd,
+                                             ovSingle, ovBCD] Then
      vPrecision := vMassiveFields.Items[I].Precision;
     BufferHeader.InputBytes(VarToBytes(vMassiveFields.Items[I].vFieldName, varString));
     BufferHeader.InputBytes(VarToBytes(vMassiveFields.Items[I].FieldType,  varInteger));
@@ -2657,7 +2723,7 @@ Begin
       vMasterCompTag    := bJsonValue.pairs[10].Value;
       If Not (bJsonValue.pairs[11].IsNull) Then
        Begin
-        vMasterCompFields := DecodeStrings(bJsonValue.pairs[11].Value{$IFDEF FPC}, csUndefined{$ENDIF});
+        vMasterCompFields := DecodeStrings(bJsonValue.pairs[11].Value{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
         BuildCompFields(vMasterCompFields);
        End;
      End;
@@ -2707,10 +2773,10 @@ Begin
             Begin
              FreeAndNil(bJsonOBJC);
              bJsonOBJC    := TRESTDWJSONInterfaceObject(bJsonArrayD.GetObject(1));
-             vDataexec.Text := DecodeStrings(bJsonOBJC.Pairs[0].Value{$IFDEF FPC}, vDatabaseCharSet{$ENDIF});
+             vDataexec.Text := DecodeStrings(bJsonOBJC.Pairs[0].Value{$IFDEF RESTDWLAZARUS}, vDatabaseCharSet{$ENDIF});
              FreeAndNil(bJsonOBJC);
              bJsonOBJC    := TRESTDWJSONInterfaceObject(bJsonArrayD.GetObject(2));
-             vDWParams.FromJSON(DecodeStrings(bJsonOBJC.Pairs[0].Value{$IFDEF FPC}, vDatabaseCharSet{$ENDIF}));
+             vDWParams.FromJSON(DecodeStrings(bJsonOBJC.Pairs[0].Value{$IFDEF RESTDWLAZARUS}, vDatabaseCharSet{$ENDIF}));
             End;
            FreeAndNil(bJsonOBJC);
            MassiveLine  := TMassiveLine.Create;
@@ -2772,17 +2838,15 @@ Begin
                    If (Not (TRESTDWJSONInterfaceObject(bJsonValueB).Pairs[0].isnull))        And
                       (TRESTDWJSONInterfaceObject(bJsonValueB).Pairs[0].Value <> cNullValue) Then
                     Begin
-                     vTempValue := DecodeStrings(TRESTDWJSONInterfaceObject(bJsonValueB).Pairs[0].Value{$IFDEF FPC}, csUndefined{$ENDIF});
+                     vTempValue := DecodeStrings(TRESTDWJSONInterfaceObject(bJsonValueB).Pairs[0].Value{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
                      MassiveLine.Values[GetFieldIndex(MassiveLine.vChanges[C-1]) +1].Value := vTempValue;
-                     {$IFNDEF FPC}
-                      {$IF (CompilerVersion < 19)}
+                     {$IF not Defined(RESTDWLAZARUS) AND not Defined(DELPHI2009UP)}
                        If vEncoding = esASCII Then
                         Begin
                          vTempValue := UTF8Decode(vTempValue);
                          MassiveLine.Values[GetFieldIndex(MassiveLine.vChanges[C-1]) +1].Value := vTempValue;
                         End;
                       {$IFEND}
-                     {$ENDIF}
                     End
                    Else
                     MassiveLine.Values[GetFieldIndex(MassiveLine.vChanges[C-1]) +1].SetValue(Null);
@@ -2829,7 +2893,7 @@ Begin
                    If vMassiveFields.Items[C-1].vFieldType in [ovString, ovWideString, ovMemo, ovWideMemo, ovFixedChar, ovFixedWideChar] Then
                     Begin
                      If lowercase(TRESTDWJSONInterfaceObject(bJsonValueB).Pairs[0].Value) <> cNullvalue then
-                      MassiveLine.Values[C].Value := DecodeStrings(TRESTDWJSONInterfaceObject(bJsonValueB).Pairs[0].Value{$IFDEF FPC}, vDatabaseCharSet{$ENDIF})
+                      MassiveLine.Values[C].Value := DecodeStrings(TRESTDWJSONInterfaceObject(bJsonValueB).Pairs[0].Value{$IFDEF RESTDWLAZARUS}, vDatabaseCharSet{$ENDIF})
                      Else
                       MassiveLine.Values[C].Value := TRESTDWJSONInterfaceObject(bJsonValueB).Pairs[0].Value;
                     End
@@ -2905,7 +2969,7 @@ Var
            (vDataset.FieldByName(vMassiveFields.Items[I].vFieldName).ReadOnly) And
            ((Not vMassiveFields.Items[I].vKeyField) And (Not vMassiveFields.Items[I].vAutoGenerateValue)) Then
          Continue;
-        {$IFNDEF FPC}{$IF CompilerVersion > 21}
+        {$IFDEF DELPHIXEUP}
         vMassiveFields.Items[I].vReadOnly          := vDataset.FieldByName(vMassiveFields.Items[I].vFieldName).ReadOnly;
         vMassiveFields.Items[I].vAutoGenerateValue := ((vDataset.FieldByName(vMassiveFields.Items[I].vFieldName).AutoGenerateValue = arAutoInc) Or
                                                        (lowercase(vMassiveFields.Items[I].vFieldName) = lowercase(vSequenceField)));
@@ -2915,10 +2979,6 @@ Var
         {$ELSE}
         vMassiveFields.Items[I].vAutoGenerateValue := ((vDataset.FieldByName(vMassiveFields.Items[I].vFieldName).FieldKind = fkInternalCalc) Or
                                                         (lowercase(vMassiveFields.Items[I].vFieldName) = lowercase(vSequenceField)));
-        {$IFEND}
-        {$ELSE}
-        vMassiveFields.Items[I].vAutoGenerateValue := ((vDataset.FieldByName(vMassiveFields.Items[I].vFieldName).FieldKind = fkInternalCalc) Or
-                                                       (lowercase(vMassiveFields.Items[I].vFieldName) = lowercase(vSequenceField)));
         {$ENDIF}
        End;
      End;
@@ -2935,8 +2995,10 @@ Var
     If (vMassiveFields.Items[I].vAutoGenerateValue) Or
        (vMassiveFields.Items[I].FieldType = ovAutoInc) Then
      vAutoinc := 'S';
-    If vMassiveFields.Items[I].FieldType In [{$IFNDEF FPC}{$IF CompilerVersion > 21}ovExtended,
-                                             {$IFEND}{$ENDIF}ovFloat, ovCurrency, ovFMTBcd, ovSingle, ovBCD] Then
+    If vMassiveFields.Items[I].FieldType In [{$IFDEF DELPHIXEUP}
+                                             ovExtended,{$ENDIF}
+                                             ovFloat, ovCurrency, ovFMTBcd,
+                                             ovSingle, ovBCD] Then
      vGenerateLine := Format(TJsonDatasetHeader, [vMassiveFields.Items[I].vFieldName,
                                                   GetValueType(vMassiveFields.Items[I].FieldType),
                                                   vPrimary, vRequired, vMassiveFields.Items[I].Size,
@@ -2966,8 +3028,8 @@ Var
    Begin
     vMassiveMode := MassiveLineBuff.MassiveMode;
     vTempLine    := Format('["%s", "%s", "%s"]', [MassiveModeToString(vMassiveMode),
-                                                  EncodeStrings(MassiveLineBuff.DataExec.Text{$IFDEF FPC}, csUndefined{$ENDIF}),
-                                                  EncodeStrings(MassiveLineBuff.Params.ToJSON{$IFDEF FPC}, csUndefined{$ENDIF})]);
+                                                  EncodeStrings(MassiveLineBuff.DataExec.Text{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF}),
+                                                  EncodeStrings(MassiveLineBuff.Params.ToJSON{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF})]);
    End
   Else
    Begin
@@ -3021,7 +3083,11 @@ Var
          Begin
           If vMassiveFields.Items[I-1].vFieldType in [ovString, ovWideString, ovMemo, ovWideMemo, ovFixedChar, ovFixedWideChar] Then
            Begin
-            vTempValue    := Format('"%s"', [EncodeStrings(MassiveLineBuff.vMassiveValues.Items[I].vJSONValue.Value{$IFDEF FPC}, csUndefined{$ENDIF})])
+            vTempValue    := Format('"%s"', [EncodeStrings(MassiveLineBuff.vMassiveValues.Items[I].vJSONValue.Value{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF})])
+           End
+          Else If vMassiveFields.Items[I-1].vFieldType in [ovDate, ovTime, ovDateTime, ovTimeStamp] Then
+           Begin
+             vTempValue    := Format('"%d"', [DateTimeToUnix(StrToDateTime(MassiveLineBuff.vMassiveValues.Items[I].vJSONValue.AsString))])
            End
           Else
            vTempValue    := Format('"%s"', [MassiveLineBuff.vMassiveValues.Items[I].vJSONValue.AsString])
@@ -3081,7 +3147,7 @@ Begin
  vTagFields := vTagFields + Format(', {"lines":[%s]}', [vLines]);
  vTagLinkFields := '';
  If Trim(vMasterCompFields) <> '' Then
-  vTagLinkFields := EncodeStrings(vMasterCompFields{$IFDEF FPC}, csUndefined{$ENDIF});
+  vTagLinkFields := EncodeStrings(vMasterCompFields{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
  Result := Format(TMassiveFormatJSON, ['ObjectType',   GetObjectName(toMassive),
                                        'Direction',    GetDirectionName(odINOUT),
                                        'Encoded',      'true',
@@ -3127,12 +3193,16 @@ begin
   Begin
    If Assigned(TList(Self).Items[Index]) Then
     Begin
-     If TRESTDWMassiveCacheValue(TList(Self).Items[Index]^) <> '' Then
-      TRESTDWMassiveCacheValue(TList(Self).Items[Index]^) := '';
-     {$IFDEF FPC}
+     If Assigned(TRESTDWMassiveCacheValue(TList(Self).Items[Index]^)) Then
+      TRESTDWMassiveCacheValue(TList(Self).Items[Index]^).Free;
+     {$IFDEF RESTDWLAZARUS}
       Dispose(PMassiveCacheValue(TList(Self).Items[Index]));
      {$ELSE}
-      Dispose(TList(Self).Items[Index]);
+      {$IFDEF FPC}
+       Dispose(PMassiveCacheValue(TList(Self).Items[Index]));
+      {$ELSE}
+       Dispose(TList(Self).Items[Index]);
+      {$ENDIF}
      {$ENDIF}
     End;
    TList(Self).Delete(Index);
@@ -3147,7 +3217,7 @@ end;
 
 function TRESTDWMassiveCacheList.GetRec(Index: Integer): TRESTDWMassiveCacheValue;
 begin
- Result := '';
+ Result := Nil;
  If (Index < Self.Count) And (Index > -1) Then
   Result := TRESTDWMassiveCacheValue(TList(Self).Items[Index]^);
 end;
@@ -3163,7 +3233,6 @@ end;
 Constructor TRESTDWMassiveCache.Create(AOwner: TComponent);
 Begin
   inherited;
- vReflectChanges         := False;
  MassiveCacheList        := TRESTDWMassiveCacheList.Create;
  vMassiveType            := mtMassiveCache;
  MassiveCacheDatasetList := TRESTDWMassiveCacheDatasetList.Create;
@@ -3190,6 +3259,7 @@ Var
  vBookmark        : String;
  Dataset          : TDataset;
  vActualRecB      : Integer;
+ aBookmark        : TBookmark;
  vBookmarkD       : String;
  vOldReadOnly     : Boolean;
  vStringStream    : TMemoryStream;
@@ -3201,7 +3271,7 @@ Var
    Begin
     Result := StrToInt(Copy(BookmarkSTR, InitStrPos, (Pos('|', BookmarkSTR) - FinalStrPos) -1));
     DeleteStr(BookmarkSTR, InitStrPos, (Pos('|', BookmarkSTR) - FinalStrPos));
-    LastTime := DecodeStrings(BookmarkSTR{$IFDEF FPC}, csUndefined{$ENDIF});
+    LastTime := DecodeStrings(BookmarkSTR{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
    End;
  End;
 Begin
@@ -3214,13 +3284,14 @@ Begin
    Begin
     bJsonValueB := bJsonArray.GetObject(I);
     Try
-     vBookmark     := DecodeStrings(TRESTDWJSONInterfaceObject(bJsonValueB).Pairs[0].Value{$IFDEF FPC}, csUndefined{$ENDIF});
+     vBookmark     := DecodeStrings(TRESTDWJSONInterfaceObject(bJsonValueB).Pairs[0].Value{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
      vComponentTag := TRESTDWJSONInterfaceObject(bJsonValueB).Pairs[2].Value;
      vJSONItems    := TRESTDWJSONInterfaceObject(bJsonValueB).Pairs[1].Value;
      Dataset       := MassiveCacheDatasetList.GetDataset(vComponentTag);
      vActualRecB   := DecodeREC(vBookmark, vLastTimeB);
      If Dataset <> Nil Then
       Begin
+       aBookmark := Dataset.GetBookmark;
        If (vActualRecB > -1) Then
         Begin
          If Dataset Is TRESTDWClientSQL Then
@@ -3262,23 +3333,21 @@ Begin
                     TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).Clear;
                    Continue;
                   End;
-                 If TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).DataType in [{$IFNDEF FPC}{$if CompilerVersion > 21} // Delphi 2010 pra baixo
-                                                                          ftFixedChar, ftFixedWideChar,{$IFEND}{$ENDIF}
-                                                                          ftString,    ftWideString,
-                                                                          ftMemo {$IFNDEF FPC}
-                                                                                  {$IF CompilerVersion > 21}
-                                                                                          , ftWideMemo
-                                                                                   {$IFEND}
-                                                                                   {$ELSE}
-                                                                                   , ftWideMemo
-                                                                                  {$ENDIF}]    Then
+                 If TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY)
+                   .Pairs[0].Name).DataType in [{$IFDEF DELPHIXEUP}
+                                                ftFixedChar, ftFixedWideChar,{$ENDIF}
+                                                {$IF Defined(RESTDWLAZARUS) OR Defined(DELPHIXEUP)}
+                                                ftWideMemo,
+                                                {$IFEND}
+                                                ftString, ftWideString, ftMemo]
+                                                Then
                   Begin
                    If (vValue <> Null) And (Trim(vValue) <> cNullvalue) and (Trim(vValue) <> '') Then
                     Begin
-                     vValue := DecodeStrings(vValue{$IFDEF FPC}, csUndefined{$ENDIF});
-                     {$IFNDEF FPC}{$IF CompilerVersion < 18}
+                     vValue := DecodeStrings(vValue{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
+                     {$IF not Defined(LAZARUS) AND not Defined(DELPHI2009UP)}
                      vValue := utf8Decode(vValue);
-                     {$IFEND}{$ENDIF}
+                     {$IFEND}
                      If TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).Size > 0 Then
                       TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).AsString := Copy(vValue, 1, TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).Size)
                      Else
@@ -3289,22 +3358,22 @@ Begin
                   End
                  Else
                   Begin
-                   If TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).DataType in [ftInteger, ftSmallInt, ftAutoinc, ftWord, {$IFNDEF FPC}{$IF CompilerVersion > 21}ftLongWord, {$IFEND}{$ENDIF} ftLargeint] Then
+                   If TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).DataType in [ftInteger, ftSmallInt, ftAutoinc, ftWord, {$IFDEF DELPHIXEUP}ftLongWord,{$ENDIF} ftLargeint] Then
                     Begin
                      If (Trim(vValue) <> '') And (Trim(vValue) <> cNullvalue) Then
                       Begin
                        If vValue <> Null Then
                         Begin
-                         vValue := DecodeStrings(vValue{$IFDEF FPC}, csUndefined{$ENDIF});
-                         If TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).DataType in [{$IFNDEF FPC}{$IF CompilerVersion > 21}ftLongWord, {$IFEND}{$ENDIF}ftLargeint] Then
+                         vValue := DecodeStrings(vValue{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
+                         If TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).DataType in [{$IFDEF DELPHIXEUP}ftLongWord,{$ENDIF}ftLargeint] Then
                           Begin
-                           {$IFNDEF FPC}
-                            {$IF CompilerVersion > 21}TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).AsLargeInt := StrToInt64(vValue);
-                            {$ELSE}TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).AsInteger                     := StrToInt64(vValue);
+                            {$IF Defined(RESTDWLAZARUS) OR Defined(DELPHIXEUP)}
+                            TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY)
+                              .Pairs[0].Name).AsLargeInt := StrToInt64(vValue);
+                            {$ELSE}
+                            TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY)
+                              .Pairs[0].Name).AsInteger := StrToInt64(vValue);
                             {$IFEND}
-                           {$ELSE}
-                            TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).AsLargeInt := StrToInt64(vValue);
-                           {$ENDIF}
                           End
                          Else
                           TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).AsInteger  := StrToInt(vValue);
@@ -3313,7 +3382,7 @@ Begin
                      Else
                       TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).Clear;
                     End
-                   Else If TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).DataType in [ftFloat,   ftCurrency, ftBCD, ftFMTBcd{$IFNDEF FPC}{$IF CompilerVersion > 21}, ftSingle{$IFEND}{$ENDIF}] Then
+                   Else If TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).DataType in [ftFloat,   ftCurrency, ftBCD, ftFMTBcd{$IFDEF DELPHIXEUP}, ftSingle{$ENDIF}] Then
                     Begin
                      If (vValue <> Null) And
                         (Trim(vValue) <> cNullvalue) and
@@ -3358,7 +3427,7 @@ Begin
                      Else
                       Begin
                        If vValue <> '' Then
-                        TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).AsString := DecodeStrings(vValue{$IFDEF FPC}, csUndefined{$ENDIF})
+                        TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).AsString := DecodeStrings(vValue{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF})
                        Else
                         TRESTDWClientSQL(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).Clear;
                       End;
@@ -3390,23 +3459,22 @@ Begin
                     TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).Clear;
                    Continue;
                   End;
-                 If TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).DataType in [{$IFNDEF FPC}{$if CompilerVersion > 21} // Delphi 2010 pra baixo
-                                                                          ftFixedChar, ftFixedWideChar,{$IFEND}{$ENDIF}
-                                                                          ftString,    ftWideString,
-                                                                          ftMemo {$IFNDEF FPC}
-                                                                                  {$IF CompilerVersion > 21}
-                                                                                          , ftWideMemo
-                                                                                   {$IFEND}
-                                                                                   {$ELSE}
-                                                                                   , ftWideMemo
-                                                                                  {$ENDIF}]    Then
+                 If TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY)
+                      .Pairs[0].Name).DataType in [{$IFDEF DELPHIXEUP}
+                                                   ftFixedChar, ftFixedWideChar,{$ENDIF}
+                                                   {$IF Defined(RESTDWLAZARUS) OR Defined(DELPHIXEUP)}
+                                                   ftWideMemo,{$IFEND}
+                                                   ftString, ftWideString, ftMemo]
+                                                   Then
                   Begin
                    If (vValue <> Null) And (Trim(vValue) <> cNullvalue) and (Trim(vValue) <> '') Then
                     Begin
-                     vValue := DecodeStrings(vValue{$IFDEF FPC}, csUndefined{$ENDIF});
-                     {$IFNDEF FPC}{$IF CompilerVersion < 18}
-                     vValue := utf8Decode(vValue);
-                     {$IFEND}{$ENDIF}
+                     vValue := DecodeStrings(vValue{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
+                     {$IFNDEF FPC}
+                      {$IFDEF DELPHI2009UP}
+                       vValue := utf8Decode(vValue);
+                      {$ENDIF}
+                     {$ENDIF}
                      If TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).Size > 0 Then
                       TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).AsString := Copy(vValue, 1, TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).Size)
                      Else
@@ -3417,22 +3485,24 @@ Begin
                   End
                  Else
                   Begin
-                   If TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).DataType in [ftInteger, ftSmallInt, ftAutoinc, ftWord, {$IFNDEF FPC}{$IF CompilerVersion > 21}ftLongWord, {$IFEND}{$ENDIF} ftLargeint] Then
+                   If TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).DataType in [ftInteger, ftSmallInt, ftAutoinc, ftWord, {$IFDEF DELPHIXEUP}ftLongWord,{$ENDIF} ftLargeint] Then
                     Begin
                      If (Trim(vValue) <> '') And (Trim(vValue) <> cNullvalue) Then
                       Begin
                        If vValue <> Null Then
                         Begin
-                         vValue := DecodeStrings(vValue{$IFDEF FPC}, csUndefined{$ENDIF});
-                         If TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).DataType in [{$IFNDEF FPC}{$IF CompilerVersion > 21}ftLongWord, {$IFEND}{$ENDIF}ftLargeint] Then
+                         vValue := DecodeStrings(vValue{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
+                         If TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY)
+                              .Pairs[0].Name).DataType in [{$IFDEF DELPHIXEUP}ftLongWord,{$ENDIF}
+                                                           ftLargeint] Then
                           Begin
-                           {$IFNDEF FPC}
-                            {$IF CompilerVersion > 21}TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).AsLargeInt := StrToInt64(vValue);
-                            {$ELSE}TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).AsInteger                     := StrToInt64(vValue);
+                            {$IF Defined(RESTDWLAZARUS) OR Defined(DELPHIXEUP)}
+                            TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY)
+                              .Pairs[0].Name).AsLargeInt := StrToInt64(vValue);
+                            {$ELSE}
+                            TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY)
+                              .Pairs[0].Name).AsInteger := StrToInt64(vValue);
                             {$IFEND}
-                           {$ELSE}
-                            TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).AsLargeInt := StrToInt64(vValue);
-                           {$ENDIF}
                           End
                          Else
                           TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).AsInteger  := StrToInt(vValue);
@@ -3486,7 +3556,7 @@ Begin
                      Else
                       Begin
                        If vValue <> '' Then
-                        TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).AsString := DecodeStrings(vValue{$IFDEF FPC}, csUndefined{$ENDIF})
+                        TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).AsString := DecodeStrings(vValue{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF})
                        Else
                         TRESTDWTable(Dataset).FindField(TRESTDWJSONInterfaceObject(bJsonValueY).Pairs[0].Name).Clear;
                       End;
@@ -3511,19 +3581,28 @@ Begin
            Begin
             If TRESTDWClientSQL(Dataset).State in [dsEdit, dsInsert] Then
              TRESTDWClientSQL(Dataset).Post;
-            TRESTDWClientSQL(Dataset).GotoBookmark(TBookmark(vBookmarkD));
+            {$IFDEF FPC}
+             TRESTDWClientSQL(Dataset).GotoBookmark(TBytes(@vBookmarkD));
+            {$ELSE}
+             TRESTDWClientSQL(Dataset).GotoBookmark(TBookmark(vBookmarkD));
+            {$ENDIF}
             TRESTDWClientSQL(Dataset).SetInBlockEvents(False);
            End
           Else If Dataset Is TRESTDWTable Then
            Begin
             If TRESTDWTable(Dataset).State in [dsEdit, dsInsert] Then
              TRESTDWTable(Dataset).Post;
-            TRESTDWTable(Dataset).GotoBookmark(TBookmark(vBookmarkD));
+            {$IFDEF FPC}
+             TRESTDWTable(Dataset).GotoBookmark(TBytes(@vBookmarkD));
+            {$ELSE}
+             TRESTDWTable(Dataset).GotoBookmark(TBookmark(vBookmarkD));
+            {$ENDIF}
             TRESTDWTable(Dataset).SetInBlockEvents(False);
            End;
           FreeAndNil(bJsonValueX);
          End;
         End;
+       Dataset.GotoBookmark(aBookmark);
       End;
     Finally
      FreeAndNil(bJsonValueB);
@@ -3535,15 +3614,12 @@ Begin
  End;
 End;
 
-Procedure TRESTDWMassiveCache.Add(Value         : String;
-                              Const Dataset : TDataset);
+Procedure TRESTDWMassiveCache.Add(Value         : TStream;
+                                  Const Dataset : TDataset);
 Begin
  MassiveCacheList.Add(Value);
- If vReflectChanges Then
-  Begin
-   If Dataset is TRESTDWClientSQLBase Then
-    MassiveCacheDatasetList.Add(Dataset);
-  End;
+ If Dataset is TRESTDWClientSQLBase Then
+  MassiveCacheDatasetList.Add(Dataset);
 End;
 
 Procedure TRESTDWMassiveCache.Clear;
@@ -3551,24 +3627,25 @@ Begin
  MassiveCacheList.ClearAll;
 End;
 
-Function TRESTDWMassiveCache.ToJSON : String;
+Procedure TRESTDWMassiveCache.SaveToStream(Var aStream : TStream);
 Var
- I : Integer;
- vMassiveLine : String;
+ I            : Integer;
+ BufferStream : TRESTDWBufferBase; //Pacote de Entrada
 Begin
- Result := '[%s]';
- vMassiveLine := '';
- For I := 0 To MassiveCacheList.Count -1 Do
-  Begin
-   If Length(vMassiveLine) = 0 Then
-    vMassiveLine := MassiveCacheList.Items[I]
-   Else
-    vMassiveLine := vMassiveLine + ', ' + MassiveCacheList.Items[I];
-  End;
- If vMassiveLine <> '' Then
-  Result := Format(Result, [vMassiveLine])
- Else
-  Result := vMassiveLine;
+ If Not Assigned(aStream) Then
+  Exit;
+ aStream.Position := 0;
+ BufferStream := TRESTDWBufferBase.Create;
+ Try
+  For I := 0 To MassiveCacheList.Count -1 Do
+   Begin
+    If Assigned(MassiveCacheList.Items[I]) Then
+     BufferStream.InputStream(MassiveCacheList.Items[I]);
+   End;
+ Finally
+  BufferStream.SaveToStream(aStream);
+  FreeAndNil(BufferStream);
+ End;
 End;
 
 Destructor TRESTDWMassiveCache.Destroy;
@@ -3648,7 +3725,11 @@ Var
  End;
 Begin
  Result := TStringList.Create;
+ {$IFDEF FPC}
+ FCurrentPos := PChar(@SQL);
+ {$ELSE}
  FCurrentPos := PChar(SQL);
+ {$ENDIF}
  bEscape1 := False;
  bEscape2 := False;
  bParam := False;
@@ -3817,10 +3898,14 @@ Begin
  vParamCount     := 0;
  vBinaryRequest  := False;
  vMassiveSQLMode := msqlExecute;
- {$IFDEF FPC}
+ {$IFDEF RESTDWLAZARUS}
   vSQL.OnChange := @OnChangingSQL;
  {$ELSE}
-  vSQL.OnChange := OnChangingSQL;
+  {$IFDEF FPC}
+   vSQL.OnChange := @OnChangingSQL;
+  {$ELSE}
+   vSQL.OnChange := OnChangingSQL;
+  {$ENDIF}
  {$ENDIF}
 End;
 
@@ -3838,29 +3923,24 @@ end;
 constructor TRESTDWMassiveSQLCache.Create(AOwner: TComponent);
 begin
   inherited;
- {$IFNDEF FPC}
- {$IF CompilerVersion > 21}
-  vEncoding         := esUtf8;
- {$ELSE}
-  vEncoding         := esAscii;
- {$IFEND}
- {$ELSE}
-  vEncoding         := esUtf8;
- {$ENDIF}
- vMassiveCacheSQLList           := TRESTDWMassiveCacheSQLList.Create(Self, TRESTDWMassiveCacheSQLValue);
- vMassiveCacheSQLList.vEncoding := vEncoding;
+  {$IF Defined(RESTDWLAZARUS) OR Defined(DELPHIXEUP)}
+  vEncoding := esUtf8;
+  {$ELSE}
+  vEncoding := esAscii;
+  {$IFEND}
+  vMassiveCacheSQLList           := TRESTDWMassiveCacheSQLList.Create(Self, TRESTDWMassiveCacheSQLValue);
+  vMassiveCacheSQLList.vEncoding := vEncoding;
 end;
 
 destructor TRESTDWMassiveSQLCache.Destroy;
 begin
-
- FreeAndNil(vMassiveCacheSQLList);
+  FreeAndNil(vMassiveCacheSQLList);
   inherited;
 end;
 
 function TRESTDWMassiveSQLCache.MassiveCount: Integer;
 begin
- Result := vMassiveCacheSQLList.Count;
+  Result := vMassiveCacheSQLList.Count;
 end;
 
 Function TRESTDWMassiveSQLCache.ParamsToBin(Params : TParams) : String;
@@ -3876,8 +3956,8 @@ Begin
   Begin
    vStringStream := TStringStream.Create('');
    Try
-    TPropertyPersist(Params[I]).SaveToStream(vStringStream);
-    vTempLine := EncodeStrings(vStringStream.DataString{$IFDEF FPC}, csUndefined{$ENDIF});
+    TRESTDWPropertyPersist(Params[I]).SaveToStream(vStringStream);
+    vTempLine := EncodeStrings(vStringStream.DataString{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
    Finally
     vStringStream.Free;
    End;
@@ -3908,18 +3988,18 @@ Begin
     Begin
      vDWParams     := GeTRESTDWParams(vMassiveCacheSQLList[A].vParams, vEncoding);
      If Assigned(vDWParams) Then
-      vParamsString := EncodeStrings(vDWParams.ToJSON{$IFDEF FPC}, csUndefined{$ENDIF});
+      vParamsString := EncodeStrings(vDWParams.ToJSON{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
     End
    Else
     vParamsString := EncodeStream(vMassiveCacheSQLList[A].MemDS);
    vTempJSON  := Format(cJSONValue, [MassiveSQLMode(vMassiveCacheSQLList[A].vMassiveSQLMode),
-                                     EncodeStrings(vMassiveCacheSQLList[A].vSQL.Text{$IFDEF FPC},         csUndefined{$ENDIF}),
+                                     EncodeStrings(vMassiveCacheSQLList[A].vSQL.Text{$IFDEF RESTDWLAZARUS},         csUndefined{$ENDIF}),
                                      vParamsString,
-                                     EncodeStrings(vMassiveCacheSQLList[A].vBookmark{$IFDEF FPC},         csUndefined{$ENDIF}),
+                                     EncodeStrings(vMassiveCacheSQLList[A].vBookmark{$IFDEF RESTDWLAZARUS},         csUndefined{$ENDIF}),
                                      BooleanToString(vMassiveCacheSQLList[A].vBinaryRequest),
-                                     EncodeStrings(vMassiveCacheSQLList[A].vFetchRowSQL.Text{$IFDEF FPC}, csUndefined{$ENDIF}),
-                                     EncodeStrings(vMassiveCacheSQLList[A].vLockSQL.Text{$IFDEF FPC},     csUndefined{$ENDIF}),
-                                     EncodeStrings(vMassiveCacheSQLList[A].vUnlockSQL.Text{$IFDEF FPC},   csUndefined{$ENDIF})]);
+                                     EncodeStrings(vMassiveCacheSQLList[A].vFetchRowSQL.Text{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF}),
+                                     EncodeStrings(vMassiveCacheSQLList[A].vLockSQL.Text{$IFDEF RESTDWLAZARUS},     csUndefined{$ENDIF}),
+                                     EncodeStrings(vMassiveCacheSQLList[A].vUnlockSQL.Text{$IFDEF RESTDWLAZARUS},   csUndefined{$ENDIF})]);
    If vJSONValue = '' Then
     vJSONValue := vTempJSON
    Else
@@ -3967,18 +4047,18 @@ Begin
     Begin
      vDWParams     := GeTRESTDWParams(Items[A].vParams, vEncoding);
      If Assigned(vDWParams) Then
-      vParamsString := EncodeStrings(vDWParams.ToJSON{$IFDEF FPC}, csUndefined{$ENDIF});
+      vParamsString := EncodeStrings(vDWParams.ToJSON{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF});
     End
    Else
     vParamsString := EncodeStream(Items[A].MemDS);
    vTempJSON  := Format(cJSONValue, [MassiveSQLMode(Items[A].vMassiveSQLMode),
-                                     EncodeStrings(Items[A].vSQL.Text{$IFDEF FPC},         csUndefined{$ENDIF}),
+                                     EncodeStrings(Items[A].vSQL.Text{$IFDEF RESTDWLAZARUS},         csUndefined{$ENDIF}),
                                      vParamsString,
-                                     EncodeStrings(Items[A].vBookmark{$IFDEF FPC},         csUndefined{$ENDIF}),
+                                     EncodeStrings(Items[A].vBookmark{$IFDEF RESTDWLAZARUS},         csUndefined{$ENDIF}),
                                      BooleanToString(Items[A].vBinaryRequest),
-                                     EncodeStrings(Items[A].vFetchRowSQL.Text{$IFDEF FPC}, csUndefined{$ENDIF}),
-                                     EncodeStrings(Items[A].vLockSQL.Text{$IFDEF FPC},     csUndefined{$ENDIF}),
-                                     EncodeStrings(Items[A].vUnlockSQL.Text{$IFDEF FPC},   csUndefined{$ENDIF})]);
+                                     EncodeStrings(Items[A].vFetchRowSQL.Text{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF}),
+                                     EncodeStrings(Items[A].vLockSQL.Text{$IFDEF RESTDWLAZARUS},     csUndefined{$ENDIF}),
+                                     EncodeStrings(Items[A].vUnlockSQL.Text{$IFDEF RESTDWLAZARUS},   csUndefined{$ENDIF})]);
    If vJSONValue = '' Then
     vJSONValue := vTempJSON
    Else
@@ -4071,20 +4151,20 @@ Begin
     Begin
      If Assigned(TMassiveReplyValue(TList(Self).Items[Index]^)) Then
       Begin
-       {$IFDEF FPC}
-       FreeAndNil(TList(Self).Items[Index]^);
-       {$ELSE}
-        {$IF CompilerVersion > 33}
-         FreeAndNil(TMassiveReplyValue(TList(Self).Items[Index]^));
-         {$ELSE}
-         FreeAndNil(TList(Self).Items[Index]^);
-        {$IFEND}
-       {$ENDIF}
+        {$IFDEF DELPHI10_4UP}
+        FreeAndNil(TMassiveReplyValue(TList(Self).Items[Index]^));
+        {$ELSE}
+        FreeAndNil(TList(Self).Items[Index]^);
+        {$ENDIF}
       End;
-     {$IFDEF FPC}
+     {$IFDEF RESTDWLAZARUS}
       Dispose(PMassiveReplyValue(TList(Self).Items[Index]));
      {$ELSE}
-      Dispose(TList(Self).Items[Index]);
+      {$IFDEF FPC}
+       Dispose(PMassiveReplyValue(TList(Self).Items[Index]));
+      {$ELSE}
+       Dispose(TList(Self).Items[Index]);
+      {$ENDIF}
      {$ENDIF}
     End;
    TList(Self).Delete(Index);
@@ -4241,20 +4321,20 @@ Begin
     Begin
      If Assigned(TMassiveReplyCache(TList(Self).Items[Index]^)) Then
       Begin
-       {$IFDEF FPC}
-       FreeAndNil(TList(Self).Items[Index]^);
-       {$ELSE}
-        {$IF CompilerVersion > 33}
-         FreeAndNil(TMassiveReplyCache(TList(Self).Items[Index]^));
+        {$IFDEF DELPHI10_4UP}
+        FreeAndNil(TMassiveReplyCache(TList(Self).Items[Index]^));
         {$ELSE}
-         FreeAndNil(TList(Self).Items[Index]^);
-        {$IFEND}
-       {$ENDIF}
+        FreeAndNil(TList(Self).Items[Index]^);
+        {$ENDIF}
       End;
-     {$IFDEF FPC}
+     {$IFDEF RESTDWLAZARUS}
       Dispose(PMassiveReplyCache(TList(Self).Items[Index]));
      {$ELSE}
-      Dispose(TList(Self).Items[Index]);
+      {$IFDEF FPC}
+       Dispose(PMassiveReplyCache(TList(Self).Items[Index]));
+      {$ELSE}
+       Dispose(TList(Self).Items[Index]);
+      {$ENDIF}
      {$ENDIF}
     End;
    TList(Self).Delete(Index);
@@ -4354,10 +4434,14 @@ begin
   Begin
    If Assigned(TList(Self).Items[Index]) Then
     Begin
-     {$IFDEF FPC}
+     {$IFDEF RESTDWLAZARUS}
       Dispose(PMassiveCacheDataset(TList(Self).Items[Index]));
      {$ELSE}
-      Dispose(TList(Self).Items[Index]);
+      {$IFDEF FPC}
+       Dispose(PMassiveCacheDataset(TList(Self).Items[Index]));
+      {$ELSE}
+       Dispose(TList(Self).Items[Index]);
+      {$ENDIF}
      {$ENDIF}
     End;
    TList(Self).Delete(Index);
@@ -4415,6 +4499,28 @@ Begin
  vMassiveCacheSQLValue                := TRESTDWMassiveCacheSQLValue(vMassiveCacheSQLList.Add);
  vMassiveCacheSQLValue.BinaryRequest  := True;
  vMassiveCacheSQLValue.MemDS.LoadFromStream(MemDS);
+End;
+
+{ Global Functions }
+
+Function  MassiveSQLMode(aValue : TMassiveSQLMode) : String;
+Begin
+ Result := 'msUnknow';
+ Case aValue Of
+  msqlQuery   : Result := 'msqlQuery';
+  msqlExecute : Result := 'msqlExecute';
+ End;
+End;
+
+Function  MassiveSQLMode(aValue : String) : TMassiveSQLMode;
+Var
+ aData : String;
+Begin
+ aData := lowercase(aValue);
+ If aData = lowercase('msqlQuery') Then
+  Result := msqlQuery
+ Else If aData = lowercase('msqlExecute') Then
+  Result := msqlExecute;
 End;
 
 End.

@@ -8,7 +8,8 @@ unit RestDatawareShellservices;
 interface
 
 uses
-  uRESTDWShellServicesLazarus, uRESTDWShellServicesRegLazarus, LazarusPackageIntf;
+  uRESTDWShellServicesLazarus, uRESTDWShellServicesRegLazarus, 
+  LazarusPackageIntf;
 
 implementation
 

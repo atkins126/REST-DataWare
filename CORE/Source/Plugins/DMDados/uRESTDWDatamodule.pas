@@ -1,51 +1,38 @@
-unit uRESTDWDatamodule;
+﻿unit uRESTDWDatamodule;
+
+{$I ..\..\Includes\uRESTDW.inc}
+
+{
+  REST Dataware .
+  Criado por XyberX (Gilbero Rocha da Silva), o REST Dataware tem como objetivo o uso de REST/JSON
+ de maneira simples, em qualquer Compilador Pascal (Delphi, Lazarus e outros...).
+  O REST Dataware também tem por objetivo levar componentes compatíveis entre o Delphi e outros Compiladores
+ Pascal e com compatibilidade entre sistemas operacionais.
+  Desenvolvido para ser usado de Maneira RAD, o REST Dataware tem como objetivo principal você usuário que precisa
+ de produtividade e flexibilidade para produção de Serviços REST/JSON, simplificando o processo para você programador.
+
+ Membros do Grupo :
+
+ XyberX (Gilberto Rocha)    - Admin - Criador e Administrador  do pacote.
+ Alexandre Abbade           - Admin - Administrador do desenvolvimento de DEMOS, coordenador do Grupo.
+ Flávio Motta               - Member Tester and DEMO Developer.
+ Mobius One                 - Devel, Tester and Admin.
+ Gustavo                    - Criptografia and Devel.
+ Eloy                       - Devel.
+ Roniery                    - Devel.
+}
+
+{$IFNDEF RESTDWLAZARUS}
+ {$IFDEF FPC}
+  {$MODE OBJFPC}{$H+}
+ {$ENDIF}
+{$ENDIF}
 
 interface
 
 Uses
   SysUtils, Classes, uRESTDWDataUtils, uRESTDWComponentEvents,
-  uRESTDWBasicTypes, uRESTDWConsts, uRESTDWJSONObject, uRESTDWEncodeClass,
-  uRESTDWParams;
-
-Type
- TUserBasicAuth  =             Procedure(Welcomemsg, AccessTag,
-                                         Username, Password : String;
-                                         Var Params         : TRESTDWParams;
-                                         Var ErrorCode      : Integer;
-                                         Var ErrorMessage   : String;
-                                         Var Accept         : Boolean) Of Object;
- TUserTokenAuth  =             Procedure(Welcomemsg,
-                                         AccessTag          : String;
-                                         Params             : TRESTDWParams;
-                                         AuthOptions        : TRESTDWAuthTokenParam;
-                                         Var ErrorCode      : Integer;
-                                         Var ErrorMessage   : String;
-                                         Var TokenID        : String;
-                                         Var Accept         : Boolean) Of Object;
-
- Type
-  TRESTDWClientInfo = Class(TObject)
- Private
-  vip,
-  vUserAgent,
-  vBaseRequest,
-  vToken         : String;
-  vport          : Integer;
-  Procedure  SetClientInfo(ip,
-                           UserAgent,
-                           BaseRequest : String;
-                           port        : Integer);
- Protected
- Public
-  Constructor Create;
-//  Procedure   Assign(Source : TPersistent); Override;
- Published
-  Property BaseRequest : String  Read vBaseRequest;
-  Property ip          : String  Read vip;
-  Property UserAgent   : String  Read vUserAgent;
-  Property port        : Integer Read vport;
-  Property Token       : String  Read vToken;
- End;
+  uRESTDWBasicTypes, uRESTDWConsts, uRESTDWJSONObject, uRESTDWParams, uRESTDWAuthenticators;
 
  Type
   TServerMethodDataModule = Class(TDataModule)
@@ -74,11 +61,12 @@ Type
                              UserAgent,
                              BaseRequest : String;
                              port        : Integer);
-   Function    GetAction    (Var URL     : String;
-                             Var Params  : TRESTDWParams) : Boolean;
+   Function    GetAction    (Var URL                : String;
+                             Var Params             : TRESTDWParams;
+                             Var CORS_CustomHeaders : TStrings) : Boolean;
    Constructor Create(Sender : TComponent);Override;
    Destructor  Destroy;override;
-   Property ServerAuthOptions              : TRESTDWAuthOptionParam Read vServerAuthOptions              Write vServerAuthOptions;
+   Property    ServerAuthOptions           : TRESTDWAuthOptionParam Read vServerAuthOptions              Write vServerAuthOptions;
   Published
    Property ClientWelcomeMessage           : String              Read vClientWelcomeMessage;
    Property ClientInfo                     : TRESTDWClientInfo   Read vRESTDWClientInfo;
@@ -100,13 +88,13 @@ Type
 
 implementation
 
-{$IFDEF FPC}
+{$IFDEF RESTDWLAZARUS}
 {$R *.lfm}
 {$ELSE}
 {$R *.dfm}
 {$ENDIF}
 
-Uses uRESTDWServerEvents, uRESTDWServerContext;
+Uses uRESTDWServerEvents, uRESTDWServerContext, uRESTDWTools;
 { TServerMethodDataModule }
 
 Destructor TServerMethodDataModule.Destroy;
@@ -117,8 +105,9 @@ Begin
  Inherited;
 End;
 
-Function  TServerMethodDataModule.GetAction(Var URL     : String;
-                                            Var Params  : TRESTDWParams) : Boolean;
+Function  TServerMethodDataModule.GetAction(Var URL                : String;
+                                            Var Params             : TRESTDWParams;
+                                            Var CORS_CustomHeaders : TStrings) : Boolean;
 Var
  I, A,
  vPosQuery     : Integer;
@@ -127,6 +116,7 @@ Var
  vTempValue,
  vTempParamsURI,
  vTempURL,
+ vParamChar,
  ParamsURI     : String;
  vParamMethods : TRESTDWParamsMethods;
  Procedure ParseParams;
@@ -134,50 +124,74 @@ Var
   lst       : TStringList;
   pAux1,
   cAux1     : Integer;
+  ctempURI,
+  sAux,
   sAux1,
   sAux2     : string;
-  JSONParam : TJSONParam;
+  JSONParam : TRESTDWJSONParam;
  Begin
   lst := TStringList.Create;
   Try
-   pAux1 := Pos('?', ParamsURI);
+   ctempURI := ParamsURI;
+   pAux1    := Pos('?', ctempURI);
+   vIsQuery :=  pAux1 > 0;
    // params com /
-   sAux1 := Copy(ParamsURI, 1, pAux1 - 1);
+   If vIsQuery Then
+    Begin
+     sAux2 := Copy(ctempURI, pAux1 + 1, Length(ctempURI));
+     Delete(ctempURI, pAux1, Length(ctempURI));
+
+     If Pos('/', ctempURI) > 0 Then
+      Begin
+       sAux2 := Copy(ctempURI, pAux1 + 1, Pos('/', ctempURI) -2);
+       Delete(ctempURI, pAux1, Pos('/', ctempURI));
+      End;
+    End
+   Else
+    sAux2 := '';
    // params com &
-   sAux2 := Copy(ParamsURI, pAux1 + 1, Length(ParamsURI));
+   If ctempURI <> '' Then
+    sAux1 := Copy(ctempURI, InitStrPos, Length(ctempURI))
+   Else
+    sAux1 := '';
+   While (sAux2 <> '') Do
+    Begin
+     pAux1 := Pos('&', sAux2);
+     If pAux1 = 0 then
+      pAux1 := Length(sAux2) + 1;
+     sAux := Copy(sAux2, InitStrPos, pAux1 - 1);
+     If Pos('dwmark:', sAux) = 0 then
+      lst.Add(sAux);
+     Delete(sAux2, InitStrPos, pAux1);
+    End;
    cAux1 := 0;
    While (sAux1 <> '') Do
     Begin
      pAux1 := Pos('/', sAux1);
      If pAux1 = 0 Then
       pAux1 := Length(sAux1) + 1;
-     lst.Add(IntToStr(cAux1) + '=' + Copy(sAux1, 1, pAux1 - 1));
-     cAux1 := cAux1 + 1;
-     Delete(sAux1, 1, pAux1);
-    End;
-   While (sAux2 <> '') Do
-    Begin
-     pAux1 := Pos('&', sAux2);
-     If pAux1 = 0 then
-      pAux1 := Length(sAux2) + 1;
-     sAux1 := Copy(sAux2, 1, pAux1 - 1);
-     If Pos('dwmark:', sAux1) = 0 then
-      lst.Add(sAux1);
-     Delete(sAux2, 1, pAux1);
+     lst.Add(IntToStr(cAux1) + '=' + Copy(sAux1, InitStrPos, pAux1 - 1));
+     Inc(cAux1);
+     Delete(sAux1, InitStrPos, pAux1);
     End;
    While lst.Count > 0 Do
     Begin
      JSONParam  := Params.ItemsString[lst.Names[0]];
      If JSONParam = Nil Then
       Begin
-       JSONParam := TJSONParam.Create(Params.Encoding);
+       JSONParam := TRESTDWJSONParam.Create(Params.Encoding);
        JSONParam.ParamName := lst.Names[0];
        JSONParam.ObjectDirection := odIN;
        JSONParam.SetValue(lst.ValueFromIndex[0]);
        Params.Add(JSONParam);
       End
      Else If JSONParam.IsNull Then
-      JSONParam.SetValue(lst.ValueFromIndex[0]);
+      Begin
+       If JSONParam.Encoded Then
+        JSONParam.SetValue(DecodeStrings(lst.ValueFromIndex[0]{$IFDEF RESTDWLAZARUS}, csUndefined{$ENDIF}))
+       Else
+        JSONParam.SetValue(lst.ValueFromIndex[0]);
+      End;
      lst.Delete(0);
     End;
   Finally
@@ -187,7 +201,7 @@ Var
  Procedure CopyParams(SourceParams : TRESTDWParamsMethods);
  Var
   isrc       : Integer;
-  vTempParam : TJSONParam;
+  vTempParam : TRESTDWJSONParam;
  Begin
   For isrc := 0 To SourceParams.Count -1 Do
    Begin
@@ -195,7 +209,7 @@ Var
      Begin
       If Params.ItemsString[SourceParams.Items[isrc].ParamName] = Nil Then
        Begin
-        vTempParam := TJSONParam.Create(Params.Encoding);
+        vTempParam := TRESTDWJSONParam.Create(Params.Encoding);
         vTempParam.CopyFrom(SourceParams.Items[isrc]);
         Params.Add(vTempParam);
        End;
@@ -234,62 +248,78 @@ Begin
  vTempValue := URL;
  For I := 0 To ComponentCount -1 Do
   Begin
-    if (Components[i] is TRESTDWServerEvents) then begin
-      for A := 0 To TRESTDWServerEvents(Components[I]).Events.Count -1 do begin
-        vTempRoute := TRESTDWServerEvents(Components[I]).Events[A].BaseURL   +
-                      TRESTDWServerEvents(Components[I]).Events[A].EventName;
-
-        if ((vTempValue = '/') or (vTempValue = '')) then begin
-          if TRESTDWServerEvents(Components[I]).DefaultEvent <> '' then begin
-            vTempValue := TRESTDWServerEvents(Components[I]).DefaultEvent;
-            if vTempValue[InitStrPos] <> '/' then
-              vTempValue :=  '/' + vTempValue;
-          end;
-        end;
-
-        if SameText(vTempRoute, vTempValue) then begin
-          Result := True;
-          vTempURL := vTempRoute;
-          vTempParamsURI := '';
-          vParamMethods := TRESTDWServerEvents(Components[I]).Events[A].Params;
-          Break;
-        end
-        else if SameText(vTempRoute+'/', Copy(vTempValue+'/', 1, Length(vTempRoute+'/'))) then begin
-          Result := True;
-          vTempURL := vTempRoute;
-          vTempParamsURI := Copy(vTempValue,Length(vTempRoute) + 2, Length(vTempValue));
-          vParamMethods := TRESTDWServerEvents(Components[I]).Events[A].Params;
-        end;
-      end;
-    end
-    Else If (Components[i] Is TRESTDWServerContext) Then
-     Begin
-      For A := 0 To TRESTDWServerContext(Components[I]).ContextList.Count - 1 Do
-       Begin
-        vTempRoute := TRESTDWServerContext(Components[I]).ContextList[A].BaseURL   +
-                      TRESTDWServerContext(Components[I]).ContextList[A].ContextName;
-        If SameText(vTempRoute, vTempValue) Then
-         Begin
-          Result := True;
-          vTempURL := vTempRoute;
-          vTempParamsURI := '';
-          vParamMethods := TRESTDWServerContext(Components[I]).ContextList[A].Params;
-          Break;
-         End
-        Else If SameText(vTempRoute+'/', Copy(vTempValue+'/', 1, Length(vTempRoute+'/'))) Then
-         Begin
-          Result := True;
-          vTempURL := vTempRoute;
-          vTempParamsURI := Copy(vTempValue, Length(vTempRoute) + 2, Length(vTempValue));
-          vParamMethods := TRESTDWServerContext(Components[I]).ContextList[A].Params;
-         End;
-       End;
+   If (Components[i] Is TRESTDWServerEvents) Then
+    Begin
+     For A := 0 To TRESTDWServerEvents(Components[I]).Events.Count -1 Do
+      Begin
+       If Pos('?', vTempValue) > 0 Then
+        vParamChar := '?'
+       Else
+        vParamChar := '/';
+       If vParamChar = '/' Then
+        If Length(vTempValue) > 0 Then
+         If vTempValue[Length(vTempValue) - FinalStrPos] <> vParamChar Then
+          vTempValue := vTempValue + vParamChar;
+       vTempRoute := TRESTDWServerEvents(Components[I]).Events[A].BaseURL   +
+                      TRESTDWServerEvents(Components[I]).Events[A].EventName + vParamChar;
+       If ((vTempValue = '/') or (vTempValue = '')) Then
+        Begin
+         If TRESTDWServerEvents(Components[I]).DefaultEvent <> '' Then
+          Begin
+           vTempValue := TRESTDWServerEvents(Components[I]).DefaultEvent;
+           If vTempValue[InitStrPos] <> '/' Then
+            vTempValue :=  '/' + vTempValue;
+          End;
+        End;
+       If SameText(vTempRoute, Copy(vTempValue, InitStrPos, Length(vTempRoute))) Then
+        Begin
+         Result         := True;
+         vTempURL       := vTempRoute;
+         Delete(vTempValue, InitStrPos, Length(vTempRoute));
+         vTempParamsURI := vTempValue;
+         vParamMethods  := TRESTDWServerEvents(Components[I]).Events[A].Params;
+         BuildCORS(TRESTDWServerEvents(Components[I]).Events[A].Routes, CORS_CustomHeaders);
+         Break;
+        End;
+      End;
+    End
+   Else If (Components[i] Is TRESTDWServerContext) Then
+    Begin
+     For A := 0 To TRESTDWServerContext(Components[I]).ContextList.Count - 1 Do
+      Begin
+       If Pos('?', vTempValue) > 0 Then
+        vParamChar := '?'
+       Else
+        vParamChar := '/';
+       If vParamChar = '/' Then
+        If Length(vTempValue) > 0 Then
+         If vTempValue[Length(vTempValue) - FinalStrPos] <> vParamChar Then
+          vTempValue := vTempValue + vParamChar;
+       vTempRoute := TRESTDWServerContext(Components[I]).ContextList[A].BaseURL   +
+                     TRESTDWServerContext(Components[I]).ContextList[A].ContextName + vParamChar;
+       If SameText(vTempRoute, Copy(vTempValue, InitStrPos, Length(vTempRoute))) Then
+        Begin
+         Result         := True;
+         vTempURL       := vTempRoute;
+         Delete(vTempValue, InitStrPos, Length(vTempRoute));
+         vTempParamsURI := vTempValue;
+         vParamMethods  := TRESTDWServerContext(Components[I]).ContextList[A].Params;
+         BuildCORS(TRESTDWServerContext(Components[I]).ContextList[A].Routes, CORS_CustomHeaders);
+         Break;
+        End;
+      End;
      End;
    If Result Then
     Begin
      CopyParams(vParamMethods);
-     URL := vTempURL;
-     ParamsURI := '?' + ParamsURI;
+     URL       := vTempURL;
+     If Not vIsQuery Then
+      ParamsURI := vParamChar + ParamsURI
+     Else
+      ParamsURI := '?' + ParamsURI;
+     If vTempParamsURI <> '' Then
+      If vTempParamsURI[Length(vTempParamsURI) - FinalStrPos] = '/' Then
+       Delete(vTempParamsURI, Length(vTempParamsURI) - FinalStrPos, 1);
      ParamsURI := vTempParamsURI + ParamsURI;
      ParseParams;
      Break;
@@ -299,7 +329,7 @@ Begin
     ((URL = '')   Or
      (URL = '/')) Then
   URL := '';
-end;
+End;
 
 Procedure TServerMethodDataModule.SetClientInfo(ip,
                                                 UserAgent,
@@ -312,44 +342,19 @@ End;
 Constructor TServerMethodDataModule.Create(Sender: TComponent);
 Begin
  Inherited Create(Sender);
- vRESTDWClientInfo               := TRESTDWClientInfo.Create;
- vClientWelcomeMessage           := '';
- vServerAuthOptions              := Nil;
- {$IFNDEF FPC}
- {$IF CompilerVersion > 21}
-  Encoding         := esUtf8;
+ vRESTDWClientInfo     := TRESTDWClientInfo.Create;
+ vClientWelcomeMessage := '';
+ vServerAuthOptions    := Nil;
+ {$IF Defined(RESTDWLAZARUS) or Defined(DELPHIXEUP)}
+  Encoding := esUtf8;
  {$ELSE}
-  Encoding         := esAscii;
+  Encoding := esAscii;
  {$IFEND}
- {$ELSE}
-  Encoding         := esUtf8;
- {$ENDIF}
 End;
 
 Procedure TServerMethodDataModule.SetClientWelcomeMessage(Value: String);
 Begin
  vClientWelcomeMessage := Value;
-End;
-
-Constructor TRESTDWClientInfo.Create;
-Begin
- Inherited;
- vip          := '0.0.0.0';
- vUserAgent   := 'Undefined';
- vport        := 0;
- vToken       := '';
- vBaseRequest := '';
-End;
-
-Procedure TRESTDWClientInfo.SetClientInfo(ip,
-                                          UserAgent,
-                                          BaseRequest : String;
-                                          port        : Integer);
-Begin
- vip          := Trim(ip);
- vUserAgent   := Trim(UserAgent);
- vport        := Port;
- vBaseRequest := BaseRequest;
 End;
 
 End.

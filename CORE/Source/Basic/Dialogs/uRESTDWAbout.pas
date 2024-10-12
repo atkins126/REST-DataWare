@@ -1,13 +1,38 @@
 unit uRESTDWAbout;
 
-{$I ..\..\Includes\uRESTDWPlataform.inc}
+{$I ..\..\Includes\uRESTDW.inc}
 
-interface
+{
+  REST Dataware .
+  Criado por XyberX (Gilbero Rocha da Silva), o REST Dataware tem como objetivo o uso de REST/JSON
+ de maneira simples, em qualquer Compilador Pascal (Delphi, Lazarus e outros...).
+  O REST Dataware também tem por objetivo levar componentes compatíveis entre o Delphi e outros Compiladores
+ Pascal e com compatibilidade entre sistemas operacionais.
+  Desenvolvido para ser usado de Maneira RAD, o REST Dataware tem como objetivo principal você usuário que precisa
+ de produtividade e flexibilidade para produção de Serviços REST/JSON, simplificando o processo para você programador.
 
-uses Classes, SysUtils, uRESTDWConsts{$IFDEF FPC}, lclversion{$ENDIF};
+ Membros do Grupo :
+
+ XyberX (Gilberto Rocha)    - Admin - Criador e Administrador  do pacote.
+ Alexandre Abbade           - Admin - Administrador do desenvolvimento de DEMOS, coordenador do Grupo.
+ Flávio Motta               - Member Tester and DEMO Developer.
+ Mobius One                 - Devel, Tester and Admin.
+ Gustavo                    - Criptografia and Devel.
+ Eloy                       - Devel.
+ Roniery                    - Devel.
+}
+
+Interface
+
+{$IFDEF FPC}
+ {$MODE OBJFPC}{$H+}
+{$ENDIF}
+
+uses Classes, SysUtils, uRESTDWConsts{$IFDEF RESTDWLAZARUS}, lclversion{$ENDIF};
 
 Type
- TRESTDWComponent       = Class(TComponent)
+ TRESTDWAboutInfo = (RESTDWAbout);
+ TRESTDWComponent = Class(TComponent)
  Private
   fsAbout : TRESTDWAboutInfo;
   Function GetVersionInfo : String;
@@ -31,7 +56,7 @@ Implementation
 
 //uses {$IFNDEF RESTDWLAMW}uRESTDWAboutForm{$ENDIF};
 
-{$IFNDEF FPC}
+{$IFNDEF RESTDWLAZARUS}
 Function GetDelphiVersion : String;
 Begin
  Result := '';
@@ -65,7 +90,7 @@ Begin
   Result := 'Delphi 2010';
  {$ENDIF}
  {$IFDEF ver220} // delphi xe
-  Result := 'Delphi XE (VCL/FMX)';
+  Result := 'Delphi XE';
  {$ENDIF}
  {$IFDEF ver230} // delphi xe2
   Result := 'Delphi XE2 (VCL/FMX)';
@@ -137,7 +162,7 @@ Var
  End;
 Begin
  {$IFDEF NOGUI}
-  Msg := {$IFDEF FPC}'Lazarus/FPC ' + Format('%d.%d.%d', [lcl_major, lcl_minor, lcl_release]){$ELSE}GetDelphiVersion{$ENDIF}+sLineBreak+
+  Msg := {$IFDEF RESTDWLAZARUS}'Lazarus/FPC ' + Format('%d.%d.%d', [lcl_major, lcl_minor, lcl_release]){$ELSE}GetDelphiVersion{$ENDIF}+sLineBreak+
          'Rest Dataware Componentes'+sLineBreak+
          'https://github.com/OpenSourceCommunityBrasil/REST-DataWare' +sLineBreak+sLineBreak+
          'Version : '+ RESTDWVERSAO;
@@ -150,7 +175,7 @@ Begin
           'Version : '+ RESTDWVERSAO;
    Msg := DWStr(Msg);
   {$IFNDEF RESTDWLAMW}
-   {$IFNDEF LINUXFMX}
+   {$IFNDEF RESTDWFMX}
 //    frm := Tfrm_About.Create(nil);
 //    {$IFNDEF FPC}
 //     {$IF Defined(RESTDWFMX)}

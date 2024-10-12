@@ -1,9 +1,6 @@
 unit uRESTDWResponseTranslator;
 
-{$I ..\..\Source\Includes\uRESTDWPlataform.inc}
-{$IFDEF FPC}
- {$mode objfpc}{$H+}
-{$ENDIF}
+{$I ..\..\Source\Includes\uRESTDW.inc}
 
 {
   REST Dataware .
@@ -18,7 +15,6 @@ unit uRESTDWResponseTranslator;
 
  XyberX (Gilberto Rocha)    - Admin - Criador e Administrador  do pacote.
  Alexandre Abbade           - Admin - Administrador do desenvolvimento de DEMOS, coordenador do Grupo.
- Anderson Fiori             - Admin - Gerencia de Organização dos Projetos
  Flávio Motta               - Member Tester and DEMO Developer.
  Mobius One                 - Devel, Tester and Admin.
  Gustavo                    - Criptografia and Devel.
@@ -28,9 +24,13 @@ unit uRESTDWResponseTranslator;
 
 interface
 
+{$IFDEF FPC}
+ {$MODE OBJFPC}{$H+}
+{$ENDIF}
+
 Uses
   SysUtils, Classes,
-  uRESTDWComponentBase, uRESTDWTools, uRESTDWConsts;
+  uRESTDWAbout, uRESTDWTools, uRESTDWConsts;
 
 Type
  TPrepareGet         = Procedure (Var AUrl          : String;
@@ -52,9 +52,9 @@ Type
   vDataType     : TObjectValue;
   vRequired     : Boolean;
  Public
-  Function    GetDisplayName             : String;       Override;
-  Procedure   SetDisplayName(Const Value : String);      Override;
-  Constructor Create        (aCollection : TCollection); Override;
+  Function    GetDisplayName             : String;       {$IFNDEF FPC}Override;{$ENDIF}
+  Procedure   SetDisplayName(Const Value : String);      {$IFNDEF FPC}Override;{$ENDIF}
+  Constructor Create        (aCollection : TCollection); {$IFNDEF FPC}Override;{$ENDIF}
  Published
   Property    FieldName    : String       Read GetDisplayName Write SetDisplayName;
   Property    ElementName  : String       Read vElementName   Write vElementName;
@@ -176,12 +176,12 @@ End;
 Procedure TRESTDWResponseTranslator.GetFieldDefs(JSONBase : String = '');
 Var
  vValue       : String;
- LDataSetList : TJSONValue;
+ LDataSetList : TRESTDWJSONValue;
 Begin
  vValue := JSONBase;
  If Trim(vValue) = '' Then
   vValue := Open(RequestOpen, RequestOpenUrl);
- LDataSetList := TJSONValue.Create;
+ LDataSetList := TRESTDWJSONValue.Create;
  Try
   LDataSetList.Encoded  := False;
   If Assigned(ClientREST) Then
@@ -203,27 +203,23 @@ begin
 end;
 
 Function TRESTDWResponseTranslator.Open(ResquestType : TRequestType;
-                                    RequestURL   : String) : String;
+                                        RequestURL   : String) : String;
 Var
  vResult : TStringStream;
 Begin
- Result  := '';
- {$IFDEF FPC}
-  vResult  := TStringStream.Create('');
- {$ELSE}
-  {$if CompilerVersion > 21}
-   vResult := TStringStream.Create;
+  Result  := '';
+  {$IFDEF DELPHIXEUP}
+    vResult := TStringStream.Create('', TEncoding.UTF8);
   {$ELSE}
-   vResult := TStringStream.Create('');
-  {$IFEND}
- {$ENDIF}
+    vResult  := TStringStream.Create('');
+  {$ENDIF}
  Try
   Case ResquestType Of
    rtGet  : TRESTDWClientRESTBase(ClientREST).Get (RequestURL, Nil, vResult);
    rtPost : TRESTDWClientRESTBase(ClientREST).Post(RequestURL, Nil, vResult);
   End;
  Finally
-  {$IFDEF FPC}
+  {$IFDEF RESTDWLAZARUS}
    Result  := StringReplace(vResult.DataString, #10, '', [rfReplaceAll]);
   {$ELSE}
    Result  := StringReplace(vResult.DataString, #$A, '', [rfReplaceAll]);
@@ -351,8 +347,9 @@ Begin
  Else
   Begin
    vFieldName := Trim(Value);
-   Inherited;
+   Inherited SetDisplayName(Value);
   End;
 End;
 
 end.
+

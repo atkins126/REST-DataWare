@@ -1,6 +1,6 @@
 unit DWDCPrijndael;
 
-{$I ..\..\Includes\uRESTDWPlataform.inc}
+{$I ..\..\Includes\uRESTDW.inc}
 
 {
   REST Dataware .
@@ -15,7 +15,6 @@ unit DWDCPrijndael;
 
  XyberX (Gilberto Rocha)    - Admin - Criador e Administrador  do pacote.
  Alexandre Abbade           - Admin - Administrador do desenvolvimento de DEMOS, coordenador do Grupo.
- Anderson Fiori             - Admin - Gerencia de Organização dos Projetos
  Flávio Motta               - Member Tester and DEMO Developer.
  Mobius One                 - Devel, Tester and Admin.
  Gustavo                    - Criptografia and Devel.
@@ -23,7 +22,13 @@ unit DWDCPrijndael;
  Roniery                    - Devel.
 }
 
+
 interface
+
+{$IFDEF FPC}
+ {$MODE OBJFPC}{$H+}
+{$ENDIF}
+
 uses
   Classes, Sysutils, DWDCPtypes, DWDCPcrypt2, DWDCPconst, DWDCPblockciphers;
 

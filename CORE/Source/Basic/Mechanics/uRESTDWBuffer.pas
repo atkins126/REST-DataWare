@@ -1,6 +1,6 @@
 unit uRESTDWBuffer;
 
-{$I ..\..\Source\Includes\uRESTDWPlataform.inc}
+{$I ..\..\Includes\uRESTDW.inc}
 
 {
   REST Dataware .
@@ -15,7 +15,6 @@ unit uRESTDWBuffer;
 
  XyberX (Gilberto Rocha)    - Admin - Criador e Administrador  do pacote.
  Alexandre Abbade           - Admin - Administrador do desenvolvimento de DEMOS, coordenador do Grupo.
- Anderson Fiori             - Admin - Gerencia de Organização dos Projetos
  Flávio Motta               - Member Tester and DEMO Developer.
  Mobius One                 - Devel, Tester and Admin.
  Gustavo                    - Criptografia and Devel.
@@ -25,8 +24,12 @@ unit uRESTDWBuffer;
 
 Interface
 
+{$IFDEF FPC}
+ {$MODE OBJFPC}{$H+}
+{$ENDIF}
+
 Uses
-  Classes, SysUtils, uRESTDWException, uRESTDWBasicTypes, uRESTDWTools;
+  Classes, SysUtils, uRESTDWException, uRESTDWBasicTypes, uRESTDWProtoTypes, uRESTDWTools;
 
 Type
  eRESTDWNotEnoughDataInBuffer = Class(eRESTDWException);
@@ -58,7 +61,6 @@ Type
                       Const ALength   : Integer = -1); Overload;
   Procedure CompactHead(ACanShrink    : Boolean = True);
   Destructor Destroy; override;
-  Function   Extract         (AByteCount    : Integer = -1) : String;{$IFDEF HAS_DEPRECATED}Deprecated{$IFDEF HAS_DEPRECATED_MSG} 'Use ExtractToString()'{$ENDIF};{$ENDIF}
   Function   ExtractToString (AByteCount    : Integer = -1) : String;
   Procedure  ExtractToStream (Const AStream : TStream;
                               AByteCount    : Integer = -1;
@@ -70,6 +72,8 @@ Type
                               AByteCount    : Integer = -1;
                               AAppend       : Boolean = True;
                               AIndex        : Integer = -1);
+  Procedure  ExtractToBytesB (Var VBytes : TRESTDWBytes;
+                              AByteCount : Integer);
   Function   IndexOf         (Const AByte   : Byte;
                               AStartPos     : Integer = 0)  : Integer; Overload;
   Function   IndexOf         (Const ABytes  : TRESTDWBytes;
@@ -160,11 +164,6 @@ Begin
  Inherited Destroy;
 End;
 
-Function TRESTDWBuffer.Extract(AByteCount: Integer = -1) : String;{$IFDEF USE_CLASSINLINE}Inline;{$ENDIF}
-Begin
- Result := ExtractToString(AByteCount);
-End;
-
 Function TRESTDWBuffer.ExtractToString(AByteCount: Integer = -1) : String;
 Var
  LBytes: TRESTDWBytes;
@@ -212,6 +211,25 @@ Begin
     End
    Else
     CopyBytes(FBytes, AIndex, VBytes, LOldSize, AByteCount);
+  End;
+End;
+
+Procedure TRESTDWBuffer.ExtractToBytesB(Var VBytes : TRESTDWBytes;
+                                        AByteCount : Integer);
+Var
+ LOldPosition,
+ LOldSize : Integer;
+Begin
+ If AByteCount < 0 Then
+  AByteCount := Size;
+ If AByteCount > 0 Then
+  Begin
+   LOldSize := 0;
+   If Length(FBytes) > 0 Then
+    Begin
+     SetLength(VBytes, Length(FBytes));
+     Move(FBytes[0], VBytes[0], Length(FBytes));
+    End;
   End;
 End;
 

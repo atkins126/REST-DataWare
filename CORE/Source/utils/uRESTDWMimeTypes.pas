@@ -1,13 +1,39 @@
 unit uRESTDWMimeTypes;
 
+{$I ..\Includes\uRESTDW.inc}
+
+{
+  REST Dataware .
+  Criado por XyberX (Gilbero Rocha da Silva), o REST Dataware tem como objetivo o uso de REST/JSON
+  de maneira simples, em qualquer Compilador Pascal (Delphi, Lazarus e outros...).
+  O REST Dataware também tem por objetivo levar componentes compatíveis entre o Delphi e outros Compiladores
+  Pascal e com compatibilidade entre sistemas operacionais.
+  Desenvolvido para ser usado de Maneira RAD, o REST Dataware tem como objetivo principal você usuário que precisa
+  de produtividade e flexibilidade para produção de Serviços REST/JSON, simplificando o processo para você programador.
+
+  Membros do Grupo :
+
+  XyberX (Gilberto Rocha)    - Admin - Criador e Administrador  do pacote.
+  Alexandre Abbade           - Admin - Administrador do desenvolvimento de DEMOS, coordenador do Grupo.
+  Flávio Motta               - Member Tester and DEMO Developer.
+  Mobius One                 - Devel, Tester and Admin.
+  Gustavo                    - Criptografia and Devel.
+  Eloy                       - Devel.
+  Roniery                    - Devel.
+}
+
 interface
 
+{$IFDEF FPC}
+ {$MODE OBJFPC}{$H+}
+{$ENDIF}
+
 uses
-  {$IFDEF RESTDWWINDOWS}Windows, Registry, {$ENDIF}
-  Classes, SysUtils, StrUtils, uRESTDWConsts;
+{$IFDEF RESTDWWINDOWS}Windows, Registry, {$ENDIF}
+  Classes, SysUtils, StrUtils, uRESTDWTools, uRESTDWConsts;
 
 type
-  TMimeTable = class(TObject)
+  TRESTDWMIMEType = class(TObject)
   private
     procedure FillMIMETable(const AMIMEList: TStringList;
       const ALoadFromOS: boolean = True);
@@ -18,6 +44,8 @@ type
     FMIMEList: TStringList;
     procedure BuildDefaultCache; virtual;
   public
+    class function GetMIMEType(aFile: TFileName): string;
+    class function GetMIMETypeExt(aMIMEType: string): string;
     procedure AddMimeType(const Ext, MIMEType: string;
       const ARaiseOnError: boolean = True);
     procedure BuildCache; virtual;
@@ -29,14 +57,15 @@ type
     procedure SaveToStrings(const AStrings: TStringList);
 
     property OnBuildCache: TNotifyEvent read FOnBuildCache write FOnBuildCache;
-    property LoadTypesFromOS: boolean read FLoadTypesFromOS write FLoadTypesFromOS;
+    property LoadTypesFromOS: boolean read FLoadTypesFromOS
+      write FLoadTypesFromOS;
   end;
 
 implementation
 
 { TMimeTable }
 
-procedure TMimeTable.AddMimeType(const Ext, MIMEType: string;
+procedure TRESTDWMIMEType.AddMimeType(const Ext, MIMEType: string;
   const ARaiseOnError: boolean = True);
 var
   LExt, LMimeType: string;
@@ -64,7 +93,7 @@ begin
   end;
 end;
 
-procedure TMimeTable.BuildCache;
+procedure TRESTDWMIMEType.BuildCache;
 begin
   if Assigned(FOnBuildCache) then
     FOnBuildCache(Self)
@@ -72,12 +101,12 @@ begin
     BuildDefaultCache;
 end;
 
-procedure TMimeTable.BuildDefaultCache;
+procedure TRESTDWMIMEType.BuildDefaultCache;
 begin
   FillMIMETable(FMIMEList, LoadTypesFromOS);
 end;
 
-constructor TMimeTable.Create(const AutoFill: boolean);
+constructor TRESTDWMIMEType.Create(const AutoFill: boolean);
 begin
   inherited Create;
   FLoadTypesFromOS := True;
@@ -89,13 +118,13 @@ begin
     BuildCache;
 end;
 
-destructor TMimeTable.Destroy;
+destructor TRESTDWMIMEType.Destroy;
 begin
   FreeAndNil(FMIMEList);
   inherited Destroy;
 end;
 
-procedure TMimeTable.FillMIMETable(const AMIMEList: TStringList;
+procedure TRESTDWMIMEType.FillMIMETable(const AMIMEList: TStringList;
   const ALoadFromOS: boolean);
 begin
   if not Assigned(AMIMEList) then
@@ -307,9 +336,12 @@ begin
   AMIMEList.Add('.odf' + '=' + 'application/vnd.oasis.opendocument.formula');
   AMIMEList.Add('.odg' + '=' + 'application/vnd.oasis.opendocument.graphics');
   AMIMEList.Add('.odi' + '=' + 'application/vnd.oasis.opendocument.image');
-  AMIMEList.Add('.odm' + '=' + 'application/vnd.oasis.opendocument.text-master');
-  AMIMEList.Add('.odp' + '=' + 'application/vnd.oasis.opendocument.presentation');
-  AMIMEList.Add('.ods' + '=' + 'application/vnd.oasis.opendocument.spreadsheet');
+  AMIMEList.Add('.odm' + '=' +
+    'application/vnd.oasis.opendocument.text-master');
+  AMIMEList.Add('.odp' + '=' +
+    'application/vnd.oasis.opendocument.presentation');
+  AMIMEList.Add('.ods' + '=' +
+    'application/vnd.oasis.opendocument.spreadsheet');
   AMIMEList.Add('.odt' + '=' + 'application/vnd.oasis.opendocument.text');
   AMIMEList.Add('.oga' + '=' + 'audio/ogg');
   AMIMEList.Add('.ogg' + '=' + 'application/ogg');
@@ -324,7 +356,8 @@ begin
     'application/vnd.oasis.opendocument.presentation-template');
   AMIMEList.Add('.ots' + '=' +
     'application/vnd.oasis.opendocument.spreadsheet-template');
-  AMIMEList.Add('.ott' + '=' + 'application/vnd.oasis.opendocument.text-template');
+  AMIMEList.Add('.ott' + '=' +
+    'application/vnd.oasis.opendocument.text-template');
   AMIMEList.Add('.p' + '=' + 'text/x-pascal');
   AMIMEList.Add('.p10' + '=' + 'application/pkcs10');
   AMIMEList.Add('.p12' + '=' + 'application/x-pkcs12');
@@ -521,10 +554,11 @@ begin
   AMIMEList.Add('.z' + '=' + 'application/x-compress');
   AMIMEList.Add('.zip' + '=' + 'application/zip');
   AMIMEList.Add('.zoo' + '=' + 'application/x-zoo');
+  AMIMEList.Add('.apk' + '=' + 'application/vnd.android.package-archive');
   AMIMEList.EndUpdate;
 end;
 
-function TMimeTable.GetDefaultFileExt(const MIMEType: string): string;
+function TRESTDWMIMEType.GetDefaultFileExt(const MIMEType: string): string;
 var
   Index: integer;
   LMimeType: string;
@@ -542,7 +576,7 @@ begin
     Result := ''; { Do not Localize }
 end;
 
-function TMimeTable.GetFileMIMEType(const AFileName: string): string;
+function TRESTDWMIMEType.GetFileMIMEType(const AFileName: string): string;
 var
   Index: integer;
   LExt: string;
@@ -560,7 +594,7 @@ begin
     Result := 'application/octet-stream'; { do not localize }
 end;
 
-procedure TMimeTable.GetMIMETableFromOS(const AMIMEList: TStringList);
+procedure TRESTDWMIMEType.GetMIMETableFromOS(const AMIMEList: TStringList);
 {$IFDEF RESTDWWINDOWS}
 var
   reg: TRegistry;
@@ -607,8 +641,8 @@ begin
         reg.Closekey;
         for I := 0 to KeyList.Count - 1 do
         begin
-          if reg.OpenKeyReadOnly('\MIME\Database\Content Type\' +
-            KeyList[I]) then
+          if reg.OpenKeyReadOnly('\MIME\Database\Content Type\' + KeyList[I])
+          then
           begin { do not localize }
             LExt := LowerCase(reg.ReadString('Extension'));
             { do not localize }
@@ -633,7 +667,31 @@ begin
 {$ENDIF}
 end;
 
-procedure TMimeTable.LoadFromStrings(const AStrings: TStringList);
+class function TRESTDWMIMEType.GetMIMEType(aFile: TFileName): string;
+Var
+  Mime: TRESTDWMIMEType;
+Begin
+  Mime := TRESTDWMIMEType.Create();
+  try
+    Result := Mime.GetFileMIMEType(aFile);
+  finally
+    Mime.Free
+  end;
+end;
+
+class function TRESTDWMIMEType.GetMIMETypeExt(aMIMEType: string): string;
+Var
+  MIMEMap: TRESTDWMIMEType;
+Begin
+  MIMEMap := TRESTDWMIMEType.Create(True);
+  Try
+    Result := MIMEMap.GetDefaultFileExt(aMIMEType);
+  Finally
+    MIMEMap.Free;
+  End;
+end;
+
+procedure TRESTDWMIMEType.LoadFromStrings(const AStrings: TStringList);
 begin
   initializestrings;
   if AStrings <> nil then
@@ -648,7 +706,7 @@ begin
     end;
 end;
 
-procedure TMimeTable.SaveToStrings(const AStrings: TStringList);
+procedure TRESTDWMIMEType.SaveToStrings(const AStrings: TStringList);
 begin
   Assert(AStrings <> nil);
   AStrings.BeginUpdate;

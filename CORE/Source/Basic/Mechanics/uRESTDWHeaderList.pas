@@ -1,6 +1,6 @@
 unit uRESTDWHeaderList;
 
-{$I ..\..\Includes\uRESTDWPlataform.inc}
+{$I ..\..\Includes\uRESTDW.inc}
 
 {
   REST Dataware .
@@ -15,7 +15,6 @@ unit uRESTDWHeaderList;
 
  XyberX (Gilberto Rocha)    - Admin - Criador e Administrador  do pacote.
  Alexandre Abbade           - Admin - Administrador do desenvolvimento de DEMOS, coordenador do Grupo.
- Anderson Fiori             - Admin - Gerencia de Organização dos Projetos
  Flávio Motta               - Member Tester and DEMO Developer.
  Mobius One                 - Devel, Tester and Admin.
  Gustavo                    - Criptografia and Devel.
@@ -23,10 +22,17 @@ unit uRESTDWHeaderList;
  Roniery                    - Devel.
 }
 
+{$IFNDEF RESTDWLAZARUS}
+ {$IFDEF FPC}
+  {$MODE OBJFPC}{$H+}
+ {$ENDIF}
+{$ENDIF}
+
+
 Interface
 
 Uses
- Classes, uRESTDWBasicTypes;
+ Classes, uRESTDWProtoTypes;
 
  Type
   TRESTDWHeaderList = class(TStringList)
@@ -38,7 +44,6 @@ Uses
   FQuoteType: TRESTDWHeaderQuotingType;
   Procedure AssignTo         (Dest        : TPersistent);Override;
   Procedure DeleteFoldedLines(Index       : Integer);
-  Function  FoldLine         (AString     : String): TStrings; {$IFDEF HAS_DEPRECATED}deprecated{$IFDEF HAS_DEPRECATED_MSG} 'Use FoldLineToList()'{$ENDIF};{$ENDIF}
   Procedure FoldLineToList   (AString     : String;
                               ALines      : TStrings);
   Procedure FoldAndInsert    (AString     : String;
@@ -209,17 +214,6 @@ Begin
  Finally
   FreeAndNil(LStrs);
  End;  //finally
-End;
-
-Function TRESTDWHeaderList.FoldLine(AString : String) : TStrings;
-Begin
- Result := TStringList.Create;
- Try
-  FoldLineToList(AString, Result);
- Except
-  FreeAndNil(Result);
-  Raise;
- End;
 End;
 
 Procedure TRESTDWHeaderList.FoldLineToList(AString : string; ALines: TStrings);

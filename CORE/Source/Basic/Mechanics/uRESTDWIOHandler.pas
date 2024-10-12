@@ -1,6 +1,6 @@
 unit uRESTDWIOHandler;
 
-{$I ..\..\Source\Includes\uRESTDWPlataform.inc}
+{$I ..\..\Includes\uRESTDW.inc}
 
 {
   REST Dataware .
@@ -15,7 +15,6 @@ unit uRESTDWIOHandler;
 
  XyberX (Gilberto Rocha)    - Admin - Criador e Administrador  do pacote.
  Alexandre Abbade           - Admin - Administrador do desenvolvimento de DEMOS, coordenador do Grupo.
- Anderson Fiori             - Admin - Gerencia de Organização dos Projetos
  Flávio Motta               - Member Tester and DEMO Developer.
  Mobius One                 - Devel, Tester and Admin.
  Gustavo                    - Criptografia and Devel.
@@ -25,9 +24,13 @@ unit uRESTDWIOHandler;
 
 Interface
 
+{$IFDEF FPC}
+ {$MODE OBJFPC}{$H+}
+{$ENDIF}
+
 Uses
- Classes, uRESTDWException, uRESTDWBuffer, uRESTDWBasicTypes, uRESTDWTools,
- uRESTDWComponentBase, uRESTDWConsts;
+ Classes, uRESTDWException, uRESTDWBuffer, uRESTDWProtoTypes, uRESTDWTools,
+ uRESTDWAbout, uRESTDWConsts;
 
 Const
  GRecvBufferSizeDefault  = 32 * 1024;
@@ -40,7 +43,7 @@ Const
   eRESTDWIOHandlerRequiresLargeStream = Class(eRESTDWIOHandler);
   eRESTDWIOHandlerStreamDataTooLarge  = Class(eRESTDWIOHandler);
   TRESTDWIOHandlerClass               = Class of TRESTDWIOHandler;
-  TRESTDWIOHandler                    = class(TRESTDWComponent)
+  TRESTDWIOHandler                    = Class(TRESTDWComponent)
  Private
   FLargeStream,
   FReadLnTimedout,

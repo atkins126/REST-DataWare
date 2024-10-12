@@ -1,8 +1,6 @@
 unit uRESTDWCoder;
 
-interface
-
-{$I ..\..\Includes\uRESTDWPlataform.inc}
+{$I ..\..\Includes\uRESTDW.inc}
 
 {
   REST Dataware .
@@ -17,7 +15,6 @@ interface
 
  XyberX (Gilberto Rocha)    - Admin - Criador e Administrador  do pacote.
  Alexandre Abbade           - Admin - Administrador do desenvolvimento de DEMOS, coordenador do Grupo.
- Anderson Fiori             - Admin - Gerencia de Organização dos Projetos
  Flávio Motta               - Member Tester and DEMO Developer.
  Mobius One                 - Devel, Tester and Admin.
  Gustavo                    - Criptografia and Devel.
@@ -25,8 +22,14 @@ interface
  Roniery                    - Devel.
 }
 
+interface
+
+{$IFDEF FPC}
+ {$MODE OBJFPC}{$H+}
+{$ENDIF}
+
 uses
-  Classes, uRESTDWComponentBase, uRESTDWBasicTypes, uRESTDWTools;
+  Classes, uRESTDWAbout, uRESTDWProtoTypes, uRESTDWTools;
 
  Type
   TRESTDWEncoder = Class(TRESTDWComponent)
@@ -73,9 +76,9 @@ uses
   Procedure Decode(Const AIn    : String); Overload;
   Procedure Decode(ASrcStream   : TStream;
                    Const ABytes : Integer = -1); Overload; Virtual; Abstract;
-  Class Function DecodeString (Const AIn   : String) : String;
-  Class Function DecodeBytes  (Const AIn   : String) : TRESTDWBytes;
-  Class procedure DecodeStream(Const AIn   : String;
+  Class Function DecodeString (Const AIn   : AnsiString) : String;
+  Class Function DecodeBytes  (Const AIn   : AnsiString) : TRESTDWBytes;
+  Class procedure DecodeStream(Const AIn   : AnsiString;
                                ADestStream : TStream);
  End;
  TRESTDWDecoderClass = Class Of TRESTDWDecoder;
@@ -111,7 +114,7 @@ Begin
  End;
 End;
 
-Class Function TRESTDWDecoder.DecodeString(Const AIn : String) : String;
+Class Function TRESTDWDecoder.DecodeString(Const AIn : AnsiString) : String;
 Var
  LStream : TMemoryStream;
 Begin
@@ -125,7 +128,7 @@ Begin
  End;
 End;
 
-Class Function TRESTDWDecoder.DecodeBytes(const AIn : String) : TRESTDWBytes;
+Class Function TRESTDWDecoder.DecodeBytes(const AIn : AnsiString) : TRESTDWBytes;
 Var
  LStream : TMemoryStream;
 Begin
@@ -140,7 +143,7 @@ Begin
  End;
 End;
 
-Class Procedure TRESTDWDecoder.DecodeStream(Const AIn   : String;
+Class Procedure TRESTDWDecoder.DecodeStream(Const AIn   : AnsiString;
                                             ADestStream : TStream);
 Var
  LDecoder : TRESTDWDecoder;

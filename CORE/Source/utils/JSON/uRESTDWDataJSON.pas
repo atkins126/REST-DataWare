@@ -1,19 +1,19 @@
 unit uRESTDWDataJSON;
 
-{$I ..\..\Source\Includes\uRESTDWPlataform.inc}
+{$I ..\..\Includes\uRESTDW.inc}
 
 Interface
 
+{$IFDEF FPC}
+ {$MODE OBJFPC}{$H+}
+{$ENDIF}
+
 Uses
- {$IFDEF FPC}
-  {$IFNDEF RESTDWLAMW}
+ {$IF Defined(RESTDWLAZARUS) AND not Defined(RESTDWLAMW)}
    LCL,
-  {$ENDIF}
- {$ELSE}
-  {$IFDEF RESTDWWINDOWS}
+ {$ELSEIF Defined(RESTDWWINDOWS)}
    Windows,
-  {$ENDIF}
- {$ENDIF}
+ {$IFEND}
   SysUtils, uRESTDWDataUtils, Classes, TypInfo, Variants, uRESTDWConsts;
 
 Type
@@ -27,6 +27,7 @@ Type
   vValue       : Variant;
   vSpecialChars,
   vIsNull      : Boolean;
+  VObjectType  : TRESTDWJSONObjectType;
   Procedure   SetValue    (aValue : Variant);
  Public
   Constructor Create(aElementType : TRESTDWJSONElementType);
@@ -34,6 +35,7 @@ Type
   Procedure   Clear;
   Function    ToJSON              : String;Virtual;
   Property    ElementType         : TRESTDWJSONElementType Read VElementType  Write VElementType;
+  Property    ObjectType          : TRESTDWJSONObjectType  Read VObjectType   Write VObjectType;
   Property    Value               : Variant                Read vValue        Write SetValue;
   Property    IsNull              : Boolean                Read vIsNull       Write vIsNull;
   Property    SpecialChars        : Boolean                Read vSpecialChars Write vSpecialChars;
@@ -44,7 +46,6 @@ Type
  TRESTDWJSONBaseObjectClass = Class(TRESTDWJSONBaseClass)
  Private
   vElementName  : String;
-  VObjectType   : TRESTDWJSONObjectType;
  Private
   Property ElementType  : TRESTDWJSONElementType Read VElementType  Write VElementType;
  Public
@@ -223,14 +224,15 @@ Function unescape_chars     (s     : String)    : String;
 
 Implementation
 
-Uses uRESTDWTools, uRESTDWJSON, uRESTDWJSONInterface
-     {$IFNDEF FPC}{$IF Defined(RESTDWFMX)}, system.json{$IFEND}{$ENDIF};
+Uses
+  uRESTDWTools, uRESTDWJSON, uRESTDWJSONInterface
+ {$IFDEF RESTDWFMX}, system.json{$ENDIF};
 
 Function TrashRemove(Value : String) : String;
 Begin
- Result := StringReplace(Value,  #13, '', [rfReplaceAll]);
- Result := StringReplace(Result, #10, '', [rfReplaceAll]);
- Result := StringReplace(Result, #9,  '', [rfReplaceAll]);
+ Result := StringReplace(Value,  sLineBreak, '', [rfReplaceAll]);
+// Result := StringReplace(Result, #10, '', [rfReplaceAll]);
+// Result := StringReplace(Result, #9,  '', [rfReplaceAll]);
 End;
 
 Function DateTimeFromISO8601(Value : String)    : TDateTime;
@@ -338,7 +340,7 @@ Var
  End;
 Begin
  c      := #0;
- {$IFDEF FPC}
+ {$IFDEF RESTDWLAZARUS}
  b      := #0;
  i      := 0;
  {$ENDIF}
@@ -417,6 +419,8 @@ Begin
  BaseObjectClass^.SpecialChars := vSpecialChars;
  BaseObjectClass^.ElementName  := Key;
  BaseObjectClass^.Value        := Value;
+ BaseObjectClass^.ElementType  := etInteger;
+ BaseObjectClass^.VObjectType  := jtValue;
  Result                        := vList.Add(BaseObjectClass);
 End;
 
@@ -431,6 +435,8 @@ Begin
  BaseObjectClass^.ElementName  := Key;
  BaseObjectClass^.Value        := Value;
  BaseObjectClass^.SpecialChars := SpecialChars;
+ BaseObjectClass^.ElementType  := etString;
+ BaseObjectClass^.VObjectType  := jtValue;
  Result                        := vList.Add(BaseObjectClass);
 End;
 
@@ -444,6 +450,8 @@ Begin
  BaseObjectClass^.SpecialChars := vSpecialChars;
  BaseObjectClass^.ElementName  := Key;
  BaseObjectClass^.Value        := Value;
+ BaseObjectClass^.ElementType  := etNumeric;
+ BaseObjectClass^.VObjectType  := jtValue;
  Result                        := vList.Add(BaseObjectClass);
 End;
 
@@ -457,6 +465,8 @@ Begin
  BaseObjectClass^.SpecialChars := vSpecialChars;
  BaseObjectClass^.ElementName  := Key;
  BaseObjectClass^.Value        := Value;
+ BaseObjectClass^.ElementType  := etNumeric;
+ BaseObjectClass^.VObjectType  := jtValue;
  Result                        := vList.Add(BaseObjectClass);
 End;
 
@@ -470,6 +480,8 @@ Begin
  BaseObjectClass^.SpecialChars := vSpecialChars;
  BaseObjectClass^.ElementName  := Key;
  BaseObjectClass^.Value        := Value;
+ BaseObjectClass^.ElementType  := etBoolean;
+ BaseObjectClass^.VObjectType  := jtValue;
  Result                        := vList.Add(BaseObjectClass);
 End;
 
@@ -487,6 +499,8 @@ Begin
  BaseObjectClass^.Value          := Value;
  BaseObjectClass^.DateTimeFormat := aDateTimeFormat;
  BaseObjectClass^.FormatMask     := aFormatMask;
+ BaseObjectClass^.ElementType    := etDateTime;
+ BaseObjectClass^.VObjectType  := jtValue;
  Result                          := vList.Add(BaseObjectClass);
 End;
 
@@ -504,6 +518,8 @@ Begin
  BaseObjectClass^.Value          := Value;
  BaseObjectClass^.DateTimeFormat := aDateTimeFormat;
  BaseObjectClass^.FormatMask     := aFormatMask;
+ BaseObjectClass^.ElementType    := etDateTime;
+ BaseObjectClass^.VObjectType    := jtValue;
  Result                          := vList.Add(BaseObjectClass);
 End;
 
@@ -517,6 +533,8 @@ Begin
  BaseObjectClass^.SpecialChars := vSpecialChars;
  BaseObjectClass^.ElementName  := Key;
  BaseObjectClass^.Value        := EncodeStream(Value);
+ BaseObjectClass^.ElementType  := etBlob;
+ BaseObjectClass^.VObjectType  := jtValue;
  Result                        := vList.Add(BaseObjectClass);
 End;
 
@@ -529,6 +547,8 @@ Begin
  BaseObjectClass^.SpecialChars := vSpecialChars;
  BaseObjectClass^.ElementName  := '';
  BaseObjectClass^.Value        := Value;
+ BaseObjectClass^.ElementType  := etInteger;
+ BaseObjectClass^.VObjectType  := jtValue;
  Result                        := vList.Add(BaseObjectClass);
 End;
 
@@ -541,6 +561,8 @@ Begin
  BaseObjectClass^.SpecialChars := vSpecialChars;
  BaseObjectClass^.ElementName  := '';
  BaseObjectClass^.Value        := Value;
+ BaseObjectClass^.ElementType  := etString;
+ BaseObjectClass^.VObjectType  := jtValue;
  Result                        := vList.Add(BaseObjectClass);
 End;
 
@@ -551,7 +573,7 @@ Var
 Begin
  New(BaseObjectClass);
  BaseObjectClass^ := Value;
- {$IFDEF FPC}
+ {$IFDEF RESTDWLAZARUS}
   If BaseObjectClass^.ObjectType = jtArray Then
    ElementName   := Key
   Else
@@ -688,7 +710,7 @@ Begin
      Begin
       Case TRESTDWJSONBaseObjectClass(vList.Items[Index]^).ElementType Of
        etString   : Begin
-                     {$IFDEF FPC}
+                     {$IFDEF RESTDWLAZARUS}
                       FreeAndNil(vList.Items[Index]^);
                      {$ELSE}
                       FreeAndNil(TRESTDWJSONString(vList.Items[Index]^));
@@ -696,7 +718,7 @@ Begin
                      Dispose(PRESTDWJSONString(vList.Items[Index]));
                     End;
        etNumeric  : Begin
-                     {$IFDEF FPC}
+                     {$IFDEF RESTDWLAZARUS}
                       FreeAndNil(vList.Items[Index]^);
                      {$ELSE}
                       FreeAndNil(TRESTDWJSONNumeric(vList.Items[Index]^));
@@ -704,7 +726,7 @@ Begin
                      Dispose(PRESTDWJSONNumeric(vList.Items[Index]));
                     End;
        etInteger  : Begin
-                     {$IFDEF FPC}
+                     {$IFDEF RESTDWLAZARUS}
                       FreeAndNil(vList.Items[Index]^);
                      {$ELSE}
                       FreeAndNil(TRESTDWJSONInteger(vList.Items[Index]^));
@@ -712,7 +734,7 @@ Begin
                      Dispose(PRESTDWJSONInteger(vList.Items[Index]));
                     End;
        etBoolean  : Begin
-                     {$IFDEF FPC}
+                     {$IFDEF RESTDWLAZARUS}
                       FreeAndNil(vList.Items[Index]^);
                      {$ELSE}
                       FreeAndNil(TRESTDWJSONBoolean(vList.Items[Index]^));
@@ -720,7 +742,7 @@ Begin
                      Dispose(PRESTDWJSONBoolean(vList.Items[Index]));
                     End;
        etDateTime : Begin
-                     {$IFDEF FPC}
+                     {$IFDEF RESTDWLAZARUS}
                       FreeAndNil(vList.Items[Index]^);
                      {$ELSE}
                       FreeAndNil(TRESTDWJSONDateTime(vList.Items[Index]^));
@@ -728,7 +750,7 @@ Begin
                      Dispose(PRESTDWJSONDateTime(vList.Items[Index]));
                     End;
        etBlob     : Begin
-                     {$IFDEF FPC}
+                     {$IFDEF RESTDWLAZARUS}
                       FreeAndNil(vList.Items[Index]^);
                      {$ELSE}
                       FreeAndNil(TRESTDWJSONBlob(vList.Items[Index]^));
@@ -737,7 +759,7 @@ Begin
                     End;
        Else
         Begin
-         {$IFDEF FPC}
+         {$IFDEF RESTDWLAZARUS}
           FreeAndNil(vList.Items[Index]^);
          {$ELSE}
           FreeAndNil(TRESTDWJSONBaseObjectClass(vList.Items[Index]^));
@@ -921,7 +943,7 @@ Function TRESTDWJSONBase.Count : Integer;
 Begin
  Result := -1;
  If Assigned(vList) Then
-  Result := TList(vList).Count;
+  Result := vList.Count;
 End;
 
 Constructor TRESTDWJSONBase.Create(JSON : String);
@@ -931,8 +953,8 @@ Var
 begin
  If JSON = '' Then
   Exit;
- {$IFNDEF FPC}
-  {$IF Defined(HAS_FMX)}
+ {$IFNDEF RESTDWLAZARUS}
+  {$IFDEF RESTDWFMX}
    If JSON[InitStrPos] = '[' then
     bJsonValue  := TRESTDWJSONBaseClass(TJSONObject.ParseJSONValue(JSON) as TJsonArray)
    Else If JSON[InitStrPos] = '{' then
@@ -946,7 +968,7 @@ begin
     bJsonValue  := TRESTDWJSONBaseClass(TRESTDWJSONObject.Create(JSON))
    Else
     bJsonValue  := TRESTDWJSONBaseClass(TRESTDWJSONObject.Create('{}'));
-  {$IFEND}
+  {$ENDIF}
  {$ELSE}
   Try
    If JSON[InitStrPos] = '[' then
@@ -960,17 +982,25 @@ begin
   End;
  {$ENDIF}
  Try
-  If (bJsonValue.ClassType = TRESTDWJSONObject) Or
-     (bJsonValue.ClassType = TJSONObject)   Then
-   Begin
-    Create(jtObject);
-    ReadJSON(JSON);
-   End
-  Else
-   Begin
-    Create(jtArray);
-    ReadJSON(JSON);
-   End;
+  Try
+   If (bJsonValue.ClassType = TRESTDWJSONObject) Or
+      (bJsonValue.ClassType = TJSONObject)   Then
+    Begin
+     Create(jtObject);
+     ReadJSON(JSON);
+    End
+   Else
+    Begin
+     Create(jtArray);
+     ReadJSON(JSON);
+    End;
+  Except
+   On E: Exception Do
+    Begin
+     Raise Exception.Create(PChar(cInvalidJSON));
+     Exit;
+    End;
+  End;
  Finally
   FreeAndNil(bJsonValue);
  End;
@@ -1147,6 +1177,10 @@ Begin
  vElementType  := aElementType;
  vIsNull       := True;
  vValue        := varNull;
+ If vElementType = etUnknow Then
+  vObjectType  := jtObject
+ Else
+  vObjectType  := jtValue;
 End;
 
 Procedure TRESTDWJSONBaseClass.SetValue(aValue : Variant);
@@ -1163,6 +1197,7 @@ End;
 Constructor TRESTDWJSONString.Create;
 Begin
  Inherited Create(etString);
+ VObjectType   := jtValue;//, jtUnknow
  vSpecialChars := True;
 End;
 
@@ -1197,6 +1232,7 @@ End;
 Constructor TRESTDWJSONNumeric.Create;
 Begin
  Inherited Create(etNumeric);
+ VObjectType   := jtValue;//, jtUnknow
 End;
 
 Function TRESTDWJSONNumeric.ToJSON : String;
@@ -1220,6 +1256,7 @@ End;
 Constructor TRESTDWJSONInteger.Create;
 Begin
  Inherited Create(etInteger);
+ VObjectType   := jtValue;//, jtUnknow
 End;
 
 Function TRESTDWJSONInteger.ToJSON : String;
@@ -1243,6 +1280,7 @@ End;
 Constructor TRESTDWJSONBoolean.Create;
 Begin
  Inherited Create(etBoolean);
+ VObjectType   := jtValue;//, jtUnknow
 End;
 
 Function TRESTDWJSONBoolean.ToJSON : String;
@@ -1274,6 +1312,7 @@ End;
 Constructor TRESTDWJSONDateTime.Create;
 Begin
  Inherited Create(etDateTime);
+ VObjectType   := jtValue;//, jtUnknow
 End;
 
 Function TRESTDWJSONDateTime.ToJSON : String;
@@ -1311,6 +1350,7 @@ End;
 Constructor TRESTDWJSONBlob.Create;
 Begin
  Inherited Create(etBlob);
+ VObjectType   := jtValue;//, jtUnknow
 End;
 
 Function TRESTDWJSONBlob.SaveToFile  (Filename    : String) : Boolean;
@@ -1386,15 +1426,11 @@ Var
  JSONBase     : TRESTDWJSONBase;
  DecimalLocal : String;
 begin
- {$IFDEF FPC}
+  {$IF Defined(RESTDWLAZARUS) or not Defined(DELPHIXEUP)}
   DecimalLocal := DecimalSeparator;
- {$ELSE}
-  {$IF CompilerVersion > 21} // Delphi 2010 pra cima
-  DecimalLocal := FormatSettings.DecimalSeparator;
   {$ELSE}
-  DecimalLocal := DecimalSeparator;
+  DecimalLocal := FormatSettings.DecimalSeparator;
   {$IFEND}
- {$ENDIF}
  bJsonValue  := TRESTDWJSONInterfaceObject.Create(TrashRemove(JSON));
  Try
   If Assigned(vList) Then
